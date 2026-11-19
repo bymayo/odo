@@ -144,6 +144,43 @@ private struct GeneralSettings: View {
                 .settingsSwitch()
             }
         }
+
+        UpdatesSection()
+    }
+}
+
+// MARK: - Updates
+
+private struct UpdatesSection: View {
+    @ObservedObject private var updater = Updater.shared
+
+    var body: some View {
+        SettingsSection("Updates", footer: updater.isAvailable ? nil : "Updates are available in the installed Odo.app, not dev builds.") {
+            SettingsRow("Odo \(AppInfo.version)",
+                        detail: updater.lastUpdateCheckDate.map { "Last checked \($0.timeAgoDisplay())" },
+                        icon: "arrow.down.circle") {
+                Button("Check for Updates…") { updater.checkForUpdates() }
+                    .disabled(!updater.canCheckForUpdates)
+            }
+            if updater.isAvailable {
+                SettingsDivider()
+                SettingsRow("Check automatically") {
+                    Toggle("", isOn: Binding(
+                        get: { updater.automaticallyChecksForUpdates },
+                        set: { updater.automaticallyChecksForUpdates = $0 }
+                    ))
+                    .settingsSwitch()
+                }
+                SettingsDivider()
+                SettingsRow("Download and install automatically") {
+                    Toggle("", isOn: Binding(
+                        get: { updater.automaticallyDownloadsUpdates },
+                        set: { updater.automaticallyDownloadsUpdates = $0 }
+                    ))
+                    .settingsSwitch()
+                }
+            }
+        }
     }
 }
 

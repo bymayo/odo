@@ -40,6 +40,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         LegacyMigration.run() // before anything reads settings
+        _ = Updater.shared    // starts Sparkle's scheduled checks (Odo.app only)
         setupMainMenu()
         viewModel = StravaViewModel()
 

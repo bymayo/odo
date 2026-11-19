@@ -1,20 +1,34 @@
 import Foundation
+import ServiceManagement
 
-/// Launch-at-login via a per-user LaunchAgent. Odo runs as a bare executable
-/// (not an .app bundle), so SMAppService isn't available.
+/// Launch at login. Odo.app uses SMAppService (shows under Login Items in
+/// System Settings); dev builds run as a bare executable, so they fall back
+/// to a per-user LaunchAgent.
 enum LaunchAtLogin {
     static let label = "uk.co.bymayo.odo"
 
-    private static var plistURL: URL {
+    static var agentURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/\(label).plist")
     }
 
     static var isEnabled: Bool {
-        FileManager.default.fileExists(atPath: plistURL.path)
+        if AppInfo.isBundled {
+            return SMAppService.mainApp.status == .enabled
+        }
+        return FileManager.default.fileExists(atPath: agentURL.path)
     }
 
     static func setEnabled(_ enabled: Bool) throws {
+        if AppInfo.isBundled {
+            if enabled {
+                try SMAppService.mainApp.register()
+            } else {
+                try SMAppService.mainApp.unregister()
+            }
+            return
+        }
+
         if enabled {
             guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
                 throw NSError(domain: label, code: 1,
@@ -29,10 +43,10 @@ enum LaunchAtLogin {
             ]
             let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
             try FileManager.default.createDirectory(
-                at: plistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-            try data.write(to: plistURL, options: .atomic)
-        } else if isEnabled {
-            try FileManager.default.removeItem(at: plistURL)
+                at: agentURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            try data.write(to: agentURL, options: .atomic)
+        } else if FileManager.default.fileExists(atPath: agentURL.path) {
+            try FileManager.default.removeItem(at: agentURL)
         }
     }
 }

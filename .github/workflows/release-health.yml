@@ -1,0 +1,109 @@
+name: Release Health
+
+# Catches the release problems that otherwise show up as silence: a tag whose
+# release never got published, a version bumped on main and never tagged, and
+# an Apple agreement that will block the next notarisation. Each raises a GitHub
+# issue (see .github/scripts/release-alert.sh) and closes it once fixed.
+
+on:
+  schedule:
+    - cron: '0 8 * * *'   # daily: releases
+    - cron: '0 8 * * 1'   # Mondays: Apple, on a macOS runner (10x the minutes)
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  RELEASES_REPO: "bymayo/odo-releases"
+  INFO_PLIST: "Packaging/Info.plist"
+
+jobs:
+  releases:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Check every version made it out
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+          ALERT_TOKEN: ${{ github.token }}
+        run: |
+          now=$(date +%s)
+          problems=0
+          alert() { GH_TOKEN="$ALERT_TOKEN" .github/scripts/release-alert.sh "$@"; }
+
+          released=$(gh release list --repo "$RELEASES_REPO" --limit 100 --json tagName --jq '.[].tagName')
+          latest=$(echo "$released" | sort -V | tail -1)
+
+          # Tags newer than the newest release. An hour's grace, because the
+          # release workflow itself takes a few minutes to publish.
+          for tag in $(git tag -l 'v*' | sort -V); do
+            [ "$(printf '%s\n%s\n' "$latest" "$tag" | sort -V | tail -1)" = "$tag" ] || continue
+            [ "$tag" = "$latest" ] && continue
+            age=$(( now - $(git log -1 --format=%ct "$tag") ))
+            if [ "$age" -gt 3600 ]; then
+              echo "::error::$tag is tagged but was never released."
+              alert raise "release-${tag#v}" "$tag is tagged but was never released" \
+                "The tag exists but there is no release in $RELEASES_REPO, so nobody is being offered it. Check the Build and Release runs for $tag and re-run the failed one."
+              problems=1
+            fi
+          done
+
+          # A version on main with no tag. CLAUDE.md has the version bumped
+          # while work is under way, so this waits three days before nagging.
+          version=$(sed -n '/CFBundleShortVersionString/{n;s/.*<string>\(.*\)<\/string>.*/\1/p;}' "$INFO_PLIST")
+          if ! git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            bumped=$(git log -1 --format=%ct -G "<string>$version</string>" -- "$INFO_PLIST")
+            if [ $(( now - ${bumped:-$now} )) -gt 259200 ]; then
+              echo "::error::$version has been on main for over three days without a tag."
+              alert raise "unreleased-$version" "$version is on main but has not been tagged" \
+                "Info.plist says $version, but no v$version tag exists, so no release has run. When it is ready: git tag v$version && git push origin v$version"
+              problems=1
+            fi
+          else
+            alert clear "unreleased-$version"
+          fi
+
+          exit $problems
+
+  apple:
+    # Weekly and on demand only: macOS minutes cost ten times as much.
+    if: github.event_name == 'workflow_dispatch' || github.event.schedule == '0 8 * * 1'
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+
+      - name: Check Apple will notarise
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if xcrun notarytool history --apple-id "$APPLE_ID" --password "$APP_PASSWORD" \
+              --team-id "$TEAM_ID" > /tmp/notary.txt 2>&1; then
+            .github/scripts/release-alert.sh clear apple-agreement
+            exit 0
+          fi
+
+          cat /tmp/notary.txt
+          if grep -qi "agreement" /tmp/notary.txt; then
+            echo "::error::Apple has an agreement waiting to be accepted."
+            .github/scripts/release-alert.sh raise apple-agreement \
+              "Apple agreement needs accepting before the next release" \
+              "Apple will not notarise anything until an updated developer agreement is accepted, so the next release would fail. Sign in at https://developer.apple.com/account as the account holder and accept it (or under Business in App Store Connect)."
+          else
+            echo "::error::Apple refused the notarisation credentials."
+            .github/scripts/release-alert.sh raise apple-credentials \
+              "Apple refused the notarisation credentials" \
+              "Check the APPLE_ID, APPLE_APP_PASSWORD and APPLE_TEAM_ID secrets. The next release will fail until this passes."
+          fi
+          exit 1

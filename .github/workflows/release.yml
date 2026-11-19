@@ -1,0 +1,383 @@
+name: Build and Release
+
+# Mirrors Cargo's release pipeline. Pushing a v* tag builds Odo.app from the
+# Swift package, signs and notarises it, publishes the DMG to the public
+# releases repo and overwrites appcast.xml there (the app's SUFeedURL).
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version number (e.g., 1.0.0)'
+        required: true
+
+# Issues, so a release that cannot go out is raised where it stays in sight
+# (see .github/scripts/release-alert.sh).
+permissions:
+  contents: read
+  issues: write
+
+env:
+  APP_NAME: "Odo"
+  RELEASES_REPO: "bymayo/odo-releases"
+  SPARKLE_VERSION: "2.8.1"   # keep in step with Package.swift
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set version from tag or input
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Building version: ${VERSION}"
+
+      # A tag that disagrees with Info.plist ships an app that reports the old
+      # version, which Sparkle then offers as an update for ever (Cargo 1.0.x).
+      - name: Check the tag matches Info.plist
+        run: |
+          PLIST_VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" Packaging/Info.plist)
+          if [ "$PLIST_VERSION" != "${{ steps.version.outputs.version }}" ]; then
+            echo "::error::Tag is v${{ steps.version.outputs.version }} but Packaging/Info.plist says ${PLIST_VERSION}. Use 'make release VERSION=x.y.z', which bumps both."
+            exit 1
+          fi
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Install create-dmg
+        run: brew install create-dmg
+
+      - name: Install Sparkle tools
+        run: |
+          curl -L -o /tmp/Sparkle.tar.xz "https://github.com/sparkle-project/Sparkle/releases/download/${SPARKLE_VERSION}/Sparkle-${SPARKLE_VERSION}.tar.xz"
+          mkdir -p /tmp/Sparkle
+          tar -xf /tmp/Sparkle.tar.xz -C /tmp/Sparkle
+          echo "/tmp/Sparkle/bin" >> $GITHUB_PATH
+
+      # An unsigned build is worse than no build: Gatekeeper refuses to open it.
+      - name: Check signing secrets
+        run: |
+          missing=""
+          [ -n "${{ secrets.MACOS_CERTIFICATE_P12 }}" ] || missing="$missing MACOS_CERTIFICATE_P12"
+          [ -n "${{ secrets.MACOS_CERTIFICATE_PASSWORD }}" ] || missing="$missing MACOS_CERTIFICATE_PASSWORD"
+          [ -n "${{ secrets.MACOS_SIGNING_IDENTITY }}" ] || missing="$missing MACOS_SIGNING_IDENTITY"
+          [ -n "${{ secrets.APPLE_ID }}" ] || missing="$missing APPLE_ID"
+          [ -n "${{ secrets.APPLE_APP_PASSWORD }}" ] || missing="$missing APPLE_APP_PASSWORD"
+          [ -n "${{ secrets.APPLE_TEAM_ID }}" ] || missing="$missing APPLE_TEAM_ID"
+          [ -n "${{ secrets.SPARKLE_PRIVATE_KEY }}" ] || missing="$missing SPARKLE_PRIVATE_KEY"
+          [ -n "${{ secrets.RELEASES_REPO_TOKEN }}" ] || missing="$missing RELEASES_REPO_TOKEN"
+
+          if [ -n "$missing" ]; then
+            echo "::error::Missing secrets:$missing. See Releases in CLAUDE.md."
+            exit 1
+          fi
+
+      # Apple stops notarising whenever an updated developer agreement is
+      # waiting; asking first gets that answer in seconds and in words.
+      - name: Check Apple will notarise
+        id: agreement
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          if ! xcrun notarytool history --apple-id "$APPLE_ID" --password "$APP_PASSWORD" \
+              --team-id "$TEAM_ID" > /tmp/notary.txt 2>&1; then
+            cat /tmp/notary.txt
+            if grep -qi "agreement" /tmp/notary.txt; then
+              echo "::error::Apple has an agreement waiting to be accepted. Sign in at https://developer.apple.com/account as the account holder, accept it, then re-run this workflow."
+            else
+              echo "::error::Apple refused the notarisation credentials. Check APPLE_ID, APPLE_APP_PASSWORD and APPLE_TEAM_ID."
+            fi
+            exit 1
+          fi
+
+      - name: Import signing certificate
+        env:
+          CERTIFICATE_P12: ${{ secrets.MACOS_CERTIFICATE_P12 }}
+          CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
+        run: |
+          KEYCHAIN=/tmp/build.keychain
+          KEYCHAIN_PASSWORD=$(uuidgen)
+
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 3600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+
+          echo "$CERTIFICATE_P12" | base64 --decode > /tmp/certificate.p12
+          security import /tmp/certificate.p12 -k "$KEYCHAIN" -P "$CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          rm /tmp/certificate.p12
+
+          # Without this, codesign blocks on a UI prompt that no runner can answer.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN" >/dev/null
+          security list-keychain -d user -s "$KEYCHAIN" login.keychain
+
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      # The same script `make package SIGN=1` runs, so local and CI builds match
+      # (including the inside-out re-sign of Sparkle's helpers).
+      - name: Build, sign and notarise
+        env:
+          DEVELOPER_ID: ${{ secrets.MACOS_SIGNING_IDENTITY }}
+          TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          unset NOTARY_PROFILE
+          ./Scripts/build-dmg.sh "${{ steps.version.outputs.version }}" --sign
+
+      - name: Verify Gatekeeper accepts it
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_PATH="build/Odo-${VERSION}.dmg"
+
+          xcrun stapler validate "${DMG_PATH}"
+          spctl --assess --verbose=4 --type install "${DMG_PATH}"
+
+          hdiutil attach -quiet -nobrowse -mountpoint /tmp/dmgcheck "${DMG_PATH}"
+          spctl --assess --verbose=4 --type exec "/tmp/dmgcheck/${APP_NAME}.app"
+          codesign --verify --deep --strict --verbose=2 "/tmp/dmgcheck/${APP_NAME}.app"
+          hdiutil detach -quiet /tmp/dmgcheck
+
+      - name: Say plainly that the release is unsafe to ship
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          echo "::error::The release failed, so nothing was published."
+
+          if [ "${{ steps.agreement.outcome }}" = "failure" ] && grep -qi "agreement" /tmp/notary.txt 2>/dev/null; then
+            .github/scripts/release-alert.sh raise apple-agreement \
+              "Apple agreement needs accepting, v${VERSION} is not released" \
+              "Apple will not notarise anything until an updated developer agreement is accepted. Sign in at https://developer.apple.com/account as the account holder and accept it (or under Business in App Store Connect), then re-run ${RUN_URL}"
+          else
+            .github/scripts/release-alert.sh raise "release-${VERSION}" \
+              "v${VERSION} failed to release" \
+              "The release workflow failed, so nothing was published and the app is not offering this update. The log says why: ${RUN_URL}"
+          fi
+
+      - name: Sign update with Sparkle
+        id: sign
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_PATH="build/Odo-${VERSION}.dmg"
+
+          echo "file_size=$(stat -f%z "${DMG_PATH}")" >> $GITHUB_OUTPUT
+
+          echo "${{ secrets.SPARKLE_PRIVATE_KEY }}" > /tmp/sparkle_private_key
+          SIGNATURE=$(sign_update "${DMG_PATH}" -f /tmp/sparkle_private_key | sed 's/.*sparkle:edSignature="\([^"]*\)".*/\1/')
+          rm /tmp/sparkle_private_key
+          if [ -z "$SIGNATURE" ]; then
+            echo "::error::sign_update produced no signature; Sparkle would refuse this update."
+            exit 1
+          fi
+          echo "signature=${SIGNATURE}" >> $GITHUB_OUTPUT
+
+          echo "build=$(/usr/libexec/PlistBuddy -c 'Print CFBundleVersion' Packaging/Info.plist)" >> $GITHUB_OUTPUT
+          echo "pub_date=$(date -R)" >> $GITHUB_OUTPUT
+
+      - name: Build release notes
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, re, html
+
+          version = os.environ["VERSION"]
+          changelog = pathlib.Path("CHANGELOG.md")
+          section = ""
+          if changelog.exists():
+              text = changelog.read_text()
+              # Everything under "## <version>" up to the next "## "
+              match = re.search(rf"^##\s+{re.escape(version)}\s*$(.*?)(?=^##\s|\Z)",
+                                text, re.M | re.S)
+              if match:
+                  section = match.group(1).strip()
+
+          if not section:
+              section = f"- Odo {version}"
+
+          pathlib.Path("build/notes.md").write_text(section + "\n")
+
+          def inline(t):
+              t = html.escape(t)
+              t = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", t)
+              t = re.sub(r"`(.+?)`", r"<code>\1</code>", t)
+              return t
+
+          # Sparkle renders this in a web view, so hand it simple HTML
+          out, bullets = [], []
+          for line in section.split("\n"):
+              line = line.strip()
+              if line.startswith("- "):
+                  bullets.append(f"<li>{inline(line[2:])}</li>")
+                  continue
+              if bullets:
+                  out.append("<ul>" + "".join(bullets) + "</ul>")
+                  bullets = []
+              if line.startswith("### "):
+                  out.append(f"<h3>{inline(line[4:])}</h3>")
+              elif line:
+                  out.append(f"<p>{inline(line)}</p>")
+          if bullets:
+              out.append("<ul>" + "".join(bullets) + "</ul>")
+
+          style = (
+              "<style>"
+              "body{font:13px -apple-system,system-ui;margin:0;padding:0;color:#111}"
+              "h2{font-size:15px;margin:0 0 8px}"
+              "h3{font-size:13px;margin:12px 0 4px}"
+              "ul{margin:0;padding-left:18px}li{margin-bottom:6px}"
+              "code{font:11px ui-monospace,SFMono-Regular,Menlo;"
+              "background:rgba(127,127,127,.15);padding:1px 4px;border-radius:3px}"
+              "@media (prefers-color-scheme:dark){body{color:#eee}}"
+              "</style>"
+          )
+          pathlib.Path("build/notes.html").write_text(
+              f"{style}<h2>Version {version}</h2>{''.join(out)}"
+          )
+          print(f"release notes: {len(section.splitlines())} lines")
+          PY
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+
+      - name: Generate appcast.xml
+        run: |
+          python3 - <<'PY'
+          import os, pathlib, textwrap
+
+          e = os.environ
+          notes = pathlib.Path("build/notes.html").read_text()
+          appcast = textwrap.dedent(f"""\
+              <?xml version="1.0" encoding="utf-8"?>
+              <rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">
+                  <channel>
+                      <title>Odo Updates</title>
+                      <link>https://github.com/{e["RELEASES_REPO"]}</link>
+                      <description>Most recent updates to Odo</description>
+                      <language>en</language>
+                      <item>
+                          <title>Version {e["VERSION"]}</title>
+                          <pubDate>{e["PUB_DATE"]}</pubDate>
+                          <sparkle:version>{e["BUILD"]}</sparkle:version>
+                          <sparkle:shortVersionString>{e["VERSION"]}</sparkle:shortVersionString>
+                          <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
+                          <description><![CDATA[{notes}]]></description>
+                          <enclosure
+                              url="{e["DMG_URL"]}"
+                              sparkle:edSignature="{e["SIGNATURE"]}"
+                              length="{e["FILE_SIZE"]}"
+                              type="application/octet-stream" />
+                      </item>
+                  </channel>
+              </rss>
+          """)
+          pathlib.Path("build/appcast.xml").write_text(appcast)
+          PY
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD: ${{ steps.sign.outputs.build }}
+          FILE_SIZE: ${{ steps.sign.outputs.file_size }}
+          SIGNATURE: ${{ steps.sign.outputs.signature }}
+          PUB_DATE: ${{ steps.sign.outputs.pub_date }}
+          DMG_URL: https://github.com/${{ env.RELEASES_REPO }}/releases/download/v${{ steps.version.outputs.version }}/Odo-${{ steps.version.outputs.version }}.dmg
+
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: dmg
+          path: build/Odo-*.dmg
+
+      - name: Upload release notes artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: notes
+          path: build/notes.md
+
+      - name: Upload appcast artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: appcast
+          path: build/appcast.xml
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout alert script
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: .github/scripts
+          path: source
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Set version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+
+      - name: Checkout releases repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.RELEASES_REPO }}
+          token: ${{ secrets.RELEASES_REPO_TOKEN }}
+          path: releases-repo
+
+      # Release first, appcast second: the feed must never point at a DMG
+      # that isn't downloadable yet.
+      - name: Create release in releases repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          DMG_FILE=$(ls dmg/*.dmg)
+
+          cd releases-repo
+          gh release create "v${VERSION}" \
+            "../${DMG_FILE}" \
+            --title "Odo v${VERSION}" \
+            --notes-file "../notes/notes.md"
+
+      - name: Update appcast.xml in releases repo
+        run: |
+          cp appcast/appcast.xml releases-repo/appcast.xml
+          cd releases-repo
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add appcast.xml
+          git commit -m "Update appcast.xml for v${{ steps.version.outputs.version }}" || echo "No changes to commit"
+          git push
+
+      - name: Clear any alerts this release resolves
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          for key in apple-agreement "release-${VERSION}" "unreleased-${VERSION}"; do
+            source/.github/scripts/release-alert.sh clear "$key"
+          done
