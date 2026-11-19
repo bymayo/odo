@@ -7,48 +7,45 @@ struct YearComparisonView: View {
     @State private var metric = "distance"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("YEAR COMPARISON")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundColor(Color.white.opacity(0.4))
+        if let sport = viewModel.selectedSport {
+            YearChart(
+                series: buildSeries(sport: sport),
+                target: targetFor(sport),
+                currentYear: viewModel.currentYear,
+                today: viewModel.currentDayOfYear,
+                unit: unitFor(metric),
+                useTimeFormat: metric == "time",
+                titleBar: AnyView(titleBar)
+            )
+        }
+    }
 
-                Spacer()
+    private var titleBar: some View {
+        HStack(spacing: 12) {
+            Text("Year comparison")
+                .font(.system(size: 12))
+                .foregroundColor(Theme.textSecondary)
 
-                Picker("", selection: $metric) {
-                    Text("Dist").tag("distance")
-                    Text("Elev").tag("elevation")
-                    Text("Time").tag("time")
+            Spacer()
+
+            ForEach([("distance", "Distance"), ("elevation", "Elevation"), ("time", "Time")], id: \.0) { key, label in
+                Button(action: { metric = key }) {
+                    Text(label)
+                        .font(.system(size: 11, weight: metric == key ? .medium : .regular))
+                        .foregroundColor(metric == key ? Theme.ink : Theme.textTertiary)
                 }
-                .pickerStyle(.segmented)
-                .frame(width: 170)
-            }
-
-            if let sport = viewModel.selectedSport {
-                YearChart(
-                    series: buildSeries(sport: sport),
-                    target: targetFor(sport),
-                    currentYear: viewModel.currentYear,
-                    today: viewModel.currentDayOfYear,
-                    unit: unitFor(metric),
-                    useTimeFormat: metric == "time"
-                )
+                .buttonStyle(.borderless)
             }
         }
-        .padding(14)
-        .background(Theme.card)
-        .cornerRadius(14)
     }
 
     private func buildSeries(sport: SportCategory) -> [YearSeries] {
         let years = [viewModel.currentYear] + viewModel.visibleComparisonYears
-        return years.enumerated().map { index, year in
+        return years.map { year in
             YearSeries(
                 year: year,
                 values: viewModel.cumulativeDaily(year, sport: sport, metric: metric),
-                color: year == viewModel.currentYear
-                    ? Theme.accent
-                    : YearChart.palette[(index - 1) % YearChart.palette.count],
+                color: year == viewModel.currentYear ? Theme.accent : Theme.ink,
                 holdsAfterEnd: year == viewModel.currentYear
             )
         }
@@ -97,36 +94,42 @@ struct YearChart: View {
     let today: Int
     let unit: String
     let useTimeFormat: Bool
+    /// Title + metric switch, pinned along with the graph
+    let titleBar: AnyView
 
     @State private var hoverDay: Int?
     @State private var lockedDay: Int?
     @State private var focusedYear: Int?
+    @State private var hoveredYear: Int?
 
-    private static let dimmed = Color.white.opacity(0.13)
+    /// Clicked year wins; otherwise the table row under the mouse
+    private var highlightedYear: Int? { focusedYear ?? hoveredYear }
 
     private func isDimmed(_ s: YearSeries) -> Bool {
         focusedYear != nil && focusedYear != s.year
     }
 
-    /// Draw order: past years, then current, then the focused year on top
+    /// Draw order: past years, then current, then the highlighted year on top
     private var drawOrder: [YearSeries] {
         let base = Array(series.reversed())
-        guard let focusedYear else { return base }
-        return base.filter { $0.year != focusedYear } + base.filter { $0.year == focusedYear }
+        guard let highlightedYear else { return base }
+        return base.filter { $0.year != highlightedYear } + base.filter { $0.year == highlightedYear }
     }
 
-    static let palette: [Color] = [
-        Color(red: 0.40, green: 0.62, blue: 0.98),
-        Color(red: 0.68, green: 0.52, blue: 0.96),
-        Color(red: 0.35, green: 0.80, blue: 0.75),
-        Color(red: 0.95, green: 0.78, blue: 0.35),
-        Color(red: 0.92, green: 0.50, blue: 0.70),
-        Color(red: 0.60, green: 0.60, blue: 0.65),
-    ]
+    private func lineColor(_ s: YearSeries) -> Color {
+        if s.year == highlightedYear { return s.year == currentYear ? Theme.accent : Theme.ink.opacity(0.85) }
+        if focusedYear != nil { return Theme.ink.opacity(0.08) }
+        if s.year == currentYear { return Theme.accent }
+        return Theme.ink.opacity(hoveredYear == nil ? 0.18 : 0.1)
+    }
 
-    private static let targetColor = Color.white.opacity(0.55)
-    private static let monthStarts = [1, 32, 60, 91, 121, 152, 182, 213, 244, 274, 305, 335]
-    private static let monthLetters = ["J", "F", "M", "A", "M", "J", "J", "A", "S", "O", "N", "D"]
+    private func lineWidth(_ s: YearSeries) -> CGFloat {
+        s.year == highlightedYear || s.year == currentYear ? 2 : 1
+    }
+
+    private static let targetColor = Theme.ink.opacity(0.3)
+    private static let quarterStarts = [1, 91, 182, 274]
+    private static let quarterLabels = ["Jan", "Apr", "Jul", "Oct"]
 
     private var daysInYear: Int {
         let cal = Calendar.current
@@ -151,12 +154,6 @@ struct YearChart: View {
         useTimeFormat ? formatTime(value) : formatNumber(value, decimals: value >= 1000 ? 0 : 1)
     }
 
-    private func axisLabel(_ value: Double) -> String {
-        if useTimeFormat { return "\(Int(value))h" }
-        if value >= 1000 { return String(format: "%.0fk", value / 1000) }
-        return String(format: "%.0f", value)
-    }
-
     /// Thin out daily points for drawing; scrubbing still uses exact daily values.
     private func plotPoints(_ s: YearSeries) -> [(day: Int, value: Double)] {
         let last = s.values.count - 1
@@ -176,10 +173,39 @@ struct YearChart: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            chart
-                .frame(height: 200)
-            readout
+        LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+            Section {
+                // Table card: square top (the pinned lip above provides the rounded top)
+                readout
+                    .padding(.horizontal, 16)
+                    .padding(.top, 2)
+                    .padding(.bottom, 16)
+                    .background(RoundedCornersShape(radius: 14, top: false, bottom: true).fill(Theme.card))
+            } header: {
+                VStack(spacing: 0) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        titleBar
+                        hero
+                        chart
+                            .frame(height: 170)
+                    }
+                    .padding(16)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14, style: .continuous)
+                            .fill(Theme.card)
+                    )
+
+                    // Gap, then the table card's rounded top edge. Pinned with the graph
+                    // so rows scroll *under* a rounded edge instead of being cut off.
+                    Color.clear.frame(height: 8)
+                    RoundedCornersShape(radius: 14, top: true, bottom: false)
+                        .fill(Theme.card)
+                        .frame(height: 14)
+                }
+                .padding(.top, 6)
+                // Page background behind everything so rounded corners stay visible
+                .background(Theme.background)
+            }
         }
     }
 
@@ -198,15 +224,14 @@ struct YearChart: View {
 
             // Past years first so the current year draws on top
             ForEach(drawOrder) { s in
-                let emphasised = focusedYear == s.year || (focusedYear == nil && s.year == currentYear)
                 ForEach(plotPoints(s), id: \.day) { point in
                     LineMark(
                         x: .value("Day", point.day),
                         y: .value("Value", point.value),
                         series: .value("Series", String(s.year))
                     )
-                    .foregroundStyle(isDimmed(s) ? Self.dimmed : emphasised ? s.color : s.color.opacity(0.75))
-                    .lineStyle(StrokeStyle(lineWidth: emphasised ? 2.5 : 1.5))
+                    .foregroundStyle(lineColor(s))
+                    .lineStyle(StrokeStyle(lineWidth: lineWidth(s), lineCap: .round, lineJoin: .round))
                 }
             }
 
@@ -215,54 +240,37 @@ struct YearChart: View {
                let last = current.values.last, current.lastDay < daysInYear {
                 ForEach([current.lastDay, daysInYear], id: \.self) { day in
                     LineMark(x: .value("Day", day), y: .value("Value", last), series: .value("Series", "Hold"))
-                        .foregroundStyle(isDimmed(current) ? Self.dimmed : current.color.opacity(0.4))
-                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [2, 3]))
+                        .foregroundStyle(Theme.accent.opacity(isDimmed(current) ? 0.1 : 0.35))
+                        .lineStyle(StrokeStyle(lineWidth: 1, dash: [1, 3]))
                 }
             }
 
             RuleMark(x: .value("Day", selectedDay))
-                .foregroundStyle(lockedDay != nil ? Theme.accent.opacity(0.6)
-                    : Color.white.opacity(hoverDay == nil ? 0.12 : 0.3))
-                .lineStyle(StrokeStyle(lineWidth: 1, dash: lockedDay != nil ? [3, 2] : []))
+                .foregroundStyle(Theme.ink.opacity(lockedDay != nil ? 0.35 : 0.15))
+                .lineStyle(StrokeStyle(lineWidth: 1))
 
-            ForEach(drawOrder) { s in
+            // Dots only for this year and the highlighted year
+            ForEach(series.filter { $0.year == currentYear || $0.year == highlightedYear }) { s in
                 if let v = s.value(on: selectedDay) {
-                    if s.year == bestYear && !isDimmed(s) {
-                        PointMark(x: .value("Day", selectedDay), y: .value("Value", v))
-                            .foregroundStyle(Color.white)
-                            .symbolSize(80)
-                    }
                     PointMark(x: .value("Day", selectedDay), y: .value("Value", v))
-                        .foregroundStyle(isDimmed(s) ? Self.dimmed : s.color)
-                        .symbolSize(s.year == currentYear || s.year == bestYear ? 30 : 18)
+                        .foregroundStyle(lineColor(s))
+                        .symbolSize(28)
                 }
             }
         }
         .chartXScale(domain: 0...daysInYear)
         .chartXAxis {
-            AxisMarks(values: Self.monthStarts) { value in
-                AxisGridLine().foregroundStyle(Color.white.opacity(0.05))
-                AxisValueLabel {
-                    if let day = value.as(Int.self), let i = Self.monthStarts.firstIndex(of: day) {
-                        Text(Self.monthLetters[i])
-                            .font(.system(size: 8))
-                            .foregroundColor(Color.white.opacity(0.35))
+            AxisMarks(values: Self.quarterStarts) { value in
+                AxisValueLabel(anchor: .topLeading) {
+                    if let day = value.as(Int.self), let i = Self.quarterStarts.firstIndex(of: day) {
+                        Text(Self.quarterLabels[i])
+                            .font(.system(size: 9))
+                            .foregroundColor(Theme.textTertiary)
                     }
                 }
             }
         }
-        .chartYAxis {
-            AxisMarks(position: .leading, values: .automatic(desiredCount: 4)) { value in
-                AxisGridLine().foregroundStyle(Color.white.opacity(0.06))
-                AxisValueLabel {
-                    if let v = value.as(Double.self) {
-                        Text(axisLabel(v))
-                            .font(.system(size: 8))
-                            .foregroundColor(Color.white.opacity(0.35))
-                    }
-                }
-            }
-        }
+        .chartYAxis(.hidden)
         .chartLegend(.hidden)
         .chartOverlay { proxy in
             GeometryReader { geo in
@@ -290,82 +298,88 @@ struct YearChart: View {
         return min(max(day, 1), daysInYear)
     }
 
-    // MARK: - Readout
+    // MARK: - Hero
 
-    private static let green = Color(red: 0.4, green: 0.85, blue: 0.5)
-    private static let red = Color(red: 1.0, green: 0.45, blue: 0.4)
+    /// Nike-style: this year's total on the selected day, big
+    private var hero: some View {
+        let current = series.first { $0.year == currentYear }?.value(on: selectedDay) ?? 0
+        let vsTarget = current - targetValue(on: selectedDay)
+
+        return HStack(alignment: .lastTextBaseline) {
+            HStack(alignment: .lastTextBaseline, spacing: 4) {
+                Text(useTimeFormat ? "\(Int(current))" : formatNumber(current, decimals: current >= 100 ? 0 : 1))
+                    .font(.system(size: 34, weight: .black).width(.condensed).italic())
+                    .tracking(-0.5)
+                    .foregroundColor(Theme.ink)
+                Text(useTimeFormat ? "hrs" : unit)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+            }
+
+            Spacer()
+
+            VStack(alignment: .trailing, spacing: 2) {
+                if target > 0 {
+                    Text("\(vsTarget >= 0 ? "+" : "−")\(fmt(abs(vsTarget))) vs target")
+                        .font(.system(size: 11, weight: .medium).monospacedDigit())
+                        .foregroundColor(vsTarget >= 0 ? Theme.positive : Theme.negative)
+                }
+                Text(dateLabel(for: selectedDay))
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textTertiary)
+            }
+        }
+    }
+
+    // MARK: - Readout
 
     private var readout: some View {
         let current = series.first { $0.year == currentYear }?.value(on: selectedDay)
         let targetNow = targetValue(on: selectedDay)
 
-        return VStack(alignment: .leading, spacing: 6) {
-            HStack {
-                Text(dateLabel(for: selectedDay))
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(.white)
-                Spacer()
-                Text(lockedDay != nil ? "🔒 Locked" : "Click to lock")
-                    .font(.system(size: 9))
-                    .foregroundColor(lockedDay != nil ? Theme.accent : Color.white.opacity(0.3))
-
-                let lockedToToday = lockedDay == today
-                Button(action: { lockedDay = lockedToToday ? nil : today }) {
-                    Text("Today")
-                        .font(.system(size: 9, weight: .semibold))
-                        .padding(.horizontal, 7)
-                        .padding(.vertical, 3)
-                        .foregroundColor(lockedToToday ? Theme.background : Theme.accent)
-                        .background(lockedToToday ? Theme.accent : Color.clear)
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 5)
-                                .stroke(Theme.accent.opacity(0.6), lineWidth: 1)
-                        )
-                        .cornerRadius(5)
-                }
-                .buttonStyle(.borderless)
-                .help(lockedToToday ? "Unlock" : "Lock graph to today")
-            }
-
-            Grid(alignment: .trailing, horizontalSpacing: 6, verticalSpacing: 0) {
+        return VStack(alignment: .leading, spacing: 8) {
+            Grid(alignment: .trailing, horizontalSpacing: 8, verticalSpacing: 7) {
                 GridRow {
-                    header("Year").gridColumnAlignment(.leading)
+                    header("Year", alignment: .leading).gridColumnAlignment(.leading)
                     header(unit)
-                    header("Δ Prev")
-                    header("Δ \(String(currentYear))")
-                    header("Δ Target")
+                    header("vs prev")
+                    header("vs \(String(currentYear))")
+                    header("vs target")
                 }
-                .padding(.bottom, 4)
 
                 ForEach(Array(series.enumerated()), id: \.element.id) { index, s in
                     let value = s.value(on: selectedDay)
                     let prev = index + 1 < series.count ? series[index + 1].value(on: selectedDay) : nil
+                    let isBest = s.year == bestYear
+                    let isCurrent = s.year == currentYear
 
-                    Divider().overlay(Color.white.opacity(0.06))
                     GridRow {
-                        let isBest = s.year == bestYear
-                        HStack(spacing: 3) {
+                        HStack(spacing: 5) {
+                            Circle()
+                                .fill(isCurrent ? Theme.accent : Theme.ink.opacity(s.year == highlightedYear ? 0.85 : 0.2))
+                                .frame(width: 6, height: 6)
                             Text(String(s.year))
-                                .font(.system(size: 11, weight: s.year == currentYear || isBest ? .bold : .medium))
-                                .foregroundColor(s.color)
+                                .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
+                                .foregroundColor(isCurrent || s.year == highlightedYear ? Theme.ink : Theme.textSecondary)
                             if isBest {
                                 Image(systemName: "crown.fill")
-                                    .font(.system(size: 8))
-                                    .foregroundColor(Color(red: 1.0, green: 0.82, blue: 0.3))
+                                    .font(.system(size: 7))
+                                    .foregroundColor(Theme.gold)
                             }
                         }
-                        Text(value.map(fmt) ?? "–")
-                            .font(.system(size: 11, weight: isBest ? .bold : .regular, design: .rounded).monospacedDigit())
-                            .foregroundColor(value == nil ? Color.white.opacity(0.25)
-                                : isBest ? Color(red: 1.0, green: 0.82, blue: 0.3) : .white)
-                            .lineLimit(1)
+                        .lineLimit(1)
+                        .fixedSize()
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        cell(value.map(fmt), color: Theme.ink, weight: isBest ? .semibold : .regular)
                         delta(value, prev)
-                        delta(s.year == currentYear ? nil : value, current)
+                        delta(isCurrent ? nil : value, current)
                         delta(target > 0 ? value : nil, targetNow)
                     }
-                    .padding(.vertical, 4)
                     .opacity(isDimmed(s) ? 0.35 : 1)
                     .contentShape(Rectangle())
+                    .onHover { inside in
+                        if inside { hoveredYear = s.year } else if hoveredYear == s.year { hoveredYear = nil }
+                    }
                     .onTapGesture {
                         focusedYear = focusedYear == s.year ? nil : s.year
                     }
@@ -373,33 +387,57 @@ struct YearChart: View {
                 }
 
                 if target > 0 {
-                    Divider().overlay(Color.white.opacity(0.06))
                     GridRow {
-                        Text("Target")
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(Self.targetColor)
-                        cell(fmt(targetNow), color: Color.white.opacity(0.7))
+                        HStack(spacing: 5) {
+                            Rectangle()
+                                .fill(Self.targetColor)
+                                .frame(width: 6, height: 1)
+                            Text("Target")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        cell(fmt(targetNow), color: Theme.textSecondary)
                         cell(nil)
                         delta(targetNow, current)
                         cell(nil)
                     }
-                    .padding(.vertical, 4)
                 }
             }
+
+            HStack {
+                Text(lockedDay != nil ? "Locked to \(dateLabel(for: selectedDay).replacingOccurrences(of: "1 Jan → ", with: ""))" : "Hover to scrub · click to lock")
+                    .font(.system(size: 9))
+                    .foregroundColor(Theme.textTertiary)
+                Spacer()
+                let lockedToToday = lockedDay == today
+                Button(action: { lockedDay = lockedToToday ? nil : today }) {
+                    Text(lockedToToday ? "Unlock" : "Today")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                        .underline(lockedToToday)
+                }
+                .buttonStyle(.borderless)
+                .help(lockedToToday ? "Unlock" : "Lock graph to today")
+            }
+            .padding(.top, 2)
         }
     }
 
-    private func header(_ text: String) -> some View {
+    private func header(_ text: String, alignment: Alignment = .trailing) -> some View {
         Text(text)
-            .font(.system(size: 9, weight: .medium))
-            .foregroundColor(Color.white.opacity(0.4))
+            .font(.system(size: 9))
+            .foregroundColor(Theme.textTertiary)
+            .frame(maxWidth: .infinity, alignment: alignment)
     }
 
-    private func cell(_ text: String?, color: Color = Color.white.opacity(0.25)) -> some View {
+    private func cell(_ text: String?, color: Color = Theme.textTertiary, weight: Font.Weight = .regular) -> some View {
         Text(text ?? "–")
-            .font(.system(size: 11, design: .rounded).monospacedDigit())
-            .foregroundColor(text == nil ? Color.white.opacity(0.25) : color)
+            .font(.system(size: 11, weight: weight).monospacedDigit())
+            .foregroundColor(text == nil ? Theme.ink.opacity(0.2) : color)
             .lineLimit(1)
+            .fixedSize()
+            .frame(maxWidth: .infinity, alignment: .trailing)
     }
 
     @ViewBuilder
@@ -407,11 +445,48 @@ struct YearChart: View {
         if let value, let other {
             let diff = value - other
             Text("\(diff >= 0 ? "+" : "−")\(fmt(abs(diff)))")
-                .font(.system(size: 10, weight: .medium, design: .rounded).monospacedDigit())
-                .foregroundColor(diff >= 0 ? Self.green : Self.red)
+                .font(.system(size: 10).monospacedDigit())
+                .foregroundColor(diff >= 0 ? Theme.positive : Theme.negative)
                 .lineLimit(1)
+                .fixedSize()
+                .frame(maxWidth: .infinity, alignment: .trailing)
         } else {
             cell(nil)
         }
+    }
+}
+
+/// Rectangle with rounded corners on only the top and/or bottom edge (macOS 13 compatible)
+struct RoundedCornersShape: Shape {
+    var radius: CGFloat
+    var top: Bool
+    var bottom: Bool
+
+    func path(in rect: CGRect) -> Path {
+        let tr = top ? min(radius, rect.height / 2) : 0
+        let br = bottom ? min(radius, rect.height / 2) : 0
+        var p = Path()
+        p.move(to: CGPoint(x: rect.minX, y: rect.minY + tr))
+        if tr > 0 {
+            p.addArc(center: CGPoint(x: rect.minX + tr, y: rect.minY + tr), radius: tr,
+                     startAngle: .degrees(180), endAngle: .degrees(270), clockwise: false)
+        }
+        p.addLine(to: CGPoint(x: rect.maxX - tr, y: rect.minY))
+        if tr > 0 {
+            p.addArc(center: CGPoint(x: rect.maxX - tr, y: rect.minY + tr), radius: tr,
+                     startAngle: .degrees(270), endAngle: .degrees(0), clockwise: false)
+        }
+        p.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY - br))
+        if br > 0 {
+            p.addArc(center: CGPoint(x: rect.maxX - br, y: rect.maxY - br), radius: br,
+                     startAngle: .degrees(0), endAngle: .degrees(90), clockwise: false)
+        }
+        p.addLine(to: CGPoint(x: rect.minX + br, y: rect.maxY))
+        if br > 0 {
+            p.addArc(center: CGPoint(x: rect.minX + br, y: rect.maxY - br), radius: br,
+                     startAngle: .degrees(90), endAngle: .degrees(180), clockwise: false)
+        }
+        p.closeSubpath()
+        return p
     }
 }

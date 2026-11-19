@@ -17,8 +17,11 @@ class SettingsWindowController {
 
         let window = NSWindow(contentViewController: hostingController)
         window.title = "StravaBar Settings"
-        window.styleMask = [.titled, .closable]
-        window.setContentSize(NSSize(width: 350, height: 500))
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
+        window.titleVisibility = .hidden
+        window.isMovableByWindowBackground = true
+        window.setContentSize(NSSize(width: 420, height: 560))
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)

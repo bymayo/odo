@@ -1,14 +1,39 @@
 import Foundation
 import SwiftUI
+import AppKit
 
 // MARK: - Theme
 
 enum Theme {
-    static let background = Color(red: 0.05, green: 0.05, blue: 0.06)
-    static let card = Color(red: 0.11, green: 0.11, blue: 0.13)
-    static let accent = Color(red: 0.94, green: 0.48, blue: 0.30)
-    static let textPrimary = Color.white
-    static let textSecondary = Color.white.opacity(0.45)
+    // Neutral surfaces, Pacebar-style. Adapts to light / dark appearance.
+    static let background = dynamic(light: 0xF4F5F4, dark: 0x151615)
+    static let card = dynamic(light: 0xEBECEA, dark: 0x1F201F)
+    static let cardRaised = dynamic(light: 0xFBFBFA, dark: 0x2A2B2A)
+    /// Base ink colour; use with opacity for secondary text, hairlines and tracks
+    static let ink = dynamic(light: 0x151615, dark: 0xF5F5F4)
+    static let hairline = ink.opacity(0.07)
+
+    // The one accent — reserved for data (current year, progress, markers)
+    static let accent = dynamic(light: 0x268A50, dark: 0x3FB871)
+    static let positive = accent
+    static let negative = dynamic(light: 0xC83A32, dark: 0xFF6B5F)
+    static let gold = dynamic(light: 0xA66A11, dark: 0xE8B44A)
+
+    static let textPrimary = ink
+    static let textSecondary = ink.opacity(0.55)
+    static let textTertiary = ink.opacity(0.35)
+
+    private static func dynamic(light: UInt32, dark: UInt32) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let hex = appearance.bestMatch(from: [.darkAqua, .aqua]) == .darkAqua ? dark : light
+            return NSColor(
+                srgbRed: CGFloat((hex >> 16) & 0xFF) / 255,
+                green: CGFloat((hex >> 8) & 0xFF) / 255,
+                blue: CGFloat(hex & 0xFF) / 255,
+                alpha: 1
+            )
+        })
+    }
 }
 
 // MARK: - Strava API Response Models
@@ -42,12 +67,28 @@ struct StravaActivity: Codable {
     let startDate: String
     let movingTime: Int
     let commute: Bool?
+    /// Strava workout_type: 1/11 race, 2 long run, 3/12 workout (run/ride)
+    let workoutType: Int?
 
-    /// Finer-grained type used for filtering within a sport (commutes split out)
-    var subType: String { commute == true ? "Commute" : sportType }
+    /// Strava sport type, used for type filtering within a sport
+    var subType: String { sportType }
+
+    /// Cross-cutting tags (an activity can be a Ride *and* a Commute or Race)
+    var tags: [String] {
+        var tags: [String] = []
+        if commute == true { tags.append("Commute") }
+        switch workoutType {
+        case 1, 11: tags.append("Race")
+        case 2: tags.append("Long Run")
+        case 3, 12: tags.append("Workout")
+        default: break
+        }
+        return tags
+    }
 
     enum CodingKeys: String, CodingKey {
         case id, name, distance, commute
+        case workoutType = "workout_type"
         case totalElevationGain = "total_elevation_gain"
         case sportType = "sport_type"
         case startDate = "start_date"
@@ -122,6 +163,54 @@ enum SportCategory: Identifiable, Hashable {
         "Canoeing": "Canoeing",
     ]
 
+    private static let iconMap: [String: String] = [
+        "Cycling": "figure.outdoor.cycle",
+        "Running": "figure.run",
+        "Walking": "figure.walk",
+        "Swimming": "figure.pool.swim",
+        "Pilates": "figure.pilates",
+        "Yoga": "figure.yoga",
+        "Weights": "figure.strengthtraining.traditional",
+        "Crossfit": "figure.cross.training",
+        "HIIT": "figure.highintensity.intervaltraining",
+        "Workout": "figure.mixed.cardio",
+        "Elliptical": "figure.elliptical",
+        "Stair Stepper": "figure.stair.stepper",
+        "Rowing": "figure.rower",
+        "Kayaking": "oar.2.crossed",
+        "Canoeing": "oar.2.crossed",
+        "SUP": "figure.surfing",
+        "Surfing": "figure.surfing",
+        "Kitesurf": "figure.surfing",
+        "Windsurf": "figure.surfing",
+        "Sailing": "sailboat",
+        "Nordic Ski": "figure.skiing.crosscountry",
+        "Roller Ski": "figure.skiing.crosscountry",
+        "Backcountry Ski": "figure.skiing.crosscountry",
+        "Alpine Ski": "figure.skiing.downhill",
+        "Snowboard": "figure.snowboarding",
+        "Snowshoe": "figure.hiking",
+        "Climbing": "figure.climbing",
+        "Ice Skating": "figure.skating",
+        "Inline Skating": "figure.skating",
+        "Skateboard": "figure.skateboarding",
+        "Wheelchair": "figure.roll",
+        "Golf": "figure.golf",
+        "Soccer": "figure.soccer",
+        "Tennis": "figure.tennis",
+        "Table Tennis": "figure.table.tennis",
+        "Badminton": "figure.badminton",
+        "Squash": "figure.racquetball",
+        "Racquetball": "figure.racquetball",
+        "Pickleball": "figure.pickleball",
+    ]
+
+    /// SF Symbol for the sport, falling back to a generic figure if unavailable
+    var icon: String {
+        let name = Self.iconMap[rawValue] ?? "figure.mixed.cardio"
+        return NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil ? name : "figure.mixed.cardio"
+    }
+
     static func from(sportType: String) -> SportCategory {
         let name = sportTypeMap[sportType] ?? sportType
         return .sport(name)
@@ -145,6 +234,13 @@ func subTypeDisplayName(_ subType: String) -> String {
         result.append(ch)
     }
     return result
+}
+
+/// How a tag (Commute, Race…) filters a sport's activities
+enum TagMode: String {
+    case any      // tag doesn't matter
+    case exclude  // hide activities with this tag
+    case only     // show only activities with this tag
 }
 
 // MARK: - Per-Sport Goals

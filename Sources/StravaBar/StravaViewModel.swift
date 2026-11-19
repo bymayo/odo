@@ -9,7 +9,7 @@ private struct ActivityCache: Codable {
 }
 
 /// Bump when StravaActivity gains fields, so cached years get re-fetched
-private let kCacheVersion = 2
+private let kCacheVersion = 3
 
 @MainActor
 class StravaViewModel: ObservableObject {
@@ -146,8 +146,67 @@ class StravaViewModel: ObservableObject {
     }
 
     func includes(_ activity: StravaActivity, in sport: SportCategory) -> Bool {
-        sport.matches(sportType: activity.sportType)
-            && !settings.excludedSubTypes.contains(subTypeKey(activity.subType, sport: sport))
+        guard sport.matches(sportType: activity.sportType),
+              !settings.excludedSubTypes.contains(subTypeKey(activity.subType, sport: sport)) else { return false }
+
+        let prefix = "\(sport.rawValue)|"
+        for (key, raw) in settings.tagModes where key.hasPrefix(prefix) {
+            let tag = String(key.dropFirst(prefix.count))
+            let has = activity.tags.contains(tag)
+            switch TagMode(rawValue: raw) {
+            case .exclude where has: return false
+            case .only where !has: return false
+            default: break
+            }
+        }
+        return true
+    }
+
+    /// Tags seen for a sport across all years, most common first
+    func tags(for sport: SportCategory) -> [String] {
+        var counts: [String: Int] = [:]
+        for yearActivities in activities.values {
+            for a in yearActivities where sport.matches(sportType: a.sportType) {
+                for tag in a.tags { counts[tag, default: 0] += 1 }
+            }
+        }
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+    }
+
+    func tagMode(_ tag: String, sport: SportCategory) -> TagMode {
+        settings.tagModes[subTypeKey(tag, sport: sport)].flatMap(TagMode.init) ?? .any
+    }
+
+    private func setTagMode(_ mode: TagMode, tag: String, sport: SportCategory) {
+        objectWillChange.send()
+        let key = subTypeKey(tag, sport: sport)
+        settings.tagModes[key] = mode == .any ? nil : mode.rawValue
+    }
+
+    /// Click: hide / show activities with this tag
+    func toggleTag(_ tag: String, sport: SportCategory) {
+        setTagMode(tagMode(tag, sport: sport) == .any ? .exclude : .any, tag: tag, sport: sport)
+    }
+
+    /// Right-click: show only activities with this tag (again to undo)
+    func soloTag(_ tag: String, sport: SportCategory) {
+        let wasOnly = tagMode(tag, sport: sport) == .only
+        for other in tags(for: sport) where tagMode(other, sport: sport) == .only {
+            setTagMode(.any, tag: other, sport: sport)
+        }
+        setTagMode(wasOnly ? .any : .only, tag: tag, sport: sport)
+    }
+
+    /// Whether any type or tag filter is active for this sport
+    func isFiltering(_ sport: SportCategory) -> Bool {
+        let prefix = "\(sport.rawValue)|"
+        return settings.excludedSubTypes.contains { $0.hasPrefix(prefix) }
+            || settings.tagModes.keys.contains { $0.hasPrefix(prefix) }
+    }
+
+    /// Whether the filter control is worth showing for this sport
+    func hasFilters(_ sport: SportCategory) -> Bool {
+        subTypes(for: sport).count > 1 || !tags(for: sport).isEmpty
     }
 
     /// Sub-types seen for a sport across all years, most common first
@@ -172,6 +231,28 @@ class StravaViewModel: ObservableObject {
             settings.excludedSubTypes.remove(key)
         } else {
             settings.excludedSubTypes.insert(key)
+        }
+    }
+
+    func includeAllSubTypes(sport: SportCategory) {
+        objectWillChange.send()
+        let prefix = "\(sport.rawValue)|"
+        settings.excludedSubTypes = settings.excludedSubTypes.filter { !$0.hasPrefix(prefix) }
+        settings.tagModes = settings.tagModes.filter { !$0.key.hasPrefix(prefix) }
+    }
+
+    /// Show only this sub-type; if it's already the only one shown, show all again
+    func soloSubType(_ subType: String, sport: SportCategory) {
+        objectWillChange.send()
+        let all = subTypes(for: sport)
+        let isSolo = all.allSatisfy { isSubTypeIncluded($0, sport: sport) == ($0 == subType) }
+        for other in all {
+            let key = subTypeKey(other, sport: sport)
+            if isSolo || other == subType {
+                settings.excludedSubTypes.remove(key)
+            } else {
+                settings.excludedSubTypes.insert(key)
+            }
         }
     }
 

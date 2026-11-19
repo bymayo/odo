@@ -13,8 +13,6 @@ struct PopoverView: View {
             } else if viewModel.isLoading && viewModel.activities.isEmpty {
                 loadingView
             } else {
-                sportTabs
-                subTypeToggles
 
                 ScrollView {
                     StatsContentView(viewModel: viewModel)
@@ -27,154 +25,57 @@ struct PopoverView: View {
         }
         .frame(width: 360, height: 540)
         .background(Theme.background)
-        .preferredColorScheme(.dark)
     }
 
     // MARK: - Header
 
     private var headerView: some View {
         HStack {
-            HStack(spacing: 6) {
-                Image(systemName: "figure.run")
-                    .foregroundColor(Theme.accent)
-                    .font(.system(size: 14, weight: .semibold))
+            HStack(spacing: 9) {
+                Image(systemName: "chart.line.uptrend.xyaxis")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 26, height: 26)
+                    .background(Theme.card)
+                    .cornerRadius(7)
                 Text("StravaBar")
-                    .font(.system(size: 14, weight: .bold, design: .rounded))
-                    .foregroundColor(.white)
+                    .font(.system(size: 14, weight: .medium))
+                    .foregroundColor(Theme.ink)
             }
 
             Spacer()
 
             if viewModel.isAuthenticated {
-                if viewModel.isLoading {
-                    HStack(spacing: 4) {
-                        ProgressView()
-                            .scaleEffect(0.5)
-                            .frame(width: 10, height: 10)
-                        Text(viewModel.syncStatus.description)
-                            .font(.system(size: 10))
-                            .foregroundColor(Color.white.opacity(0.4))
-                            .lineLimit(1)
-                    }
-                } else if case .rateLimited = viewModel.syncStatus {
-                    HStack(spacing: 4) {
-                        Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.accent)
-                        Text(viewModel.syncStatus.description)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.accent)
-                            .lineLimit(1)
-                    }
-                } else {
-                    if case .done = viewModel.syncStatus {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color(red: 0.4, green: 0.85, blue: 0.5))
-                    }
-
-                    Button(action: {
-                        Task { await viewModel.fetchAllData() }
-                    }) {
-                        Image(systemName: "arrow.clockwise")
-                            .font(.system(size: 11))
-                            .foregroundColor(Color.white.opacity(0.5))
-                    }
-                    .buttonStyle(.borderless)
-                    .help("Refresh data")
-                }
-
-                Button(action: {
-                    SettingsWindowController.shared.open(viewModel: viewModel)
-                }) {
-                    Image(systemName: "gear")
-                        .font(.system(size: 11))
-                        .foregroundColor(Color.white.opacity(0.5))
-                }
-                .buttonStyle(.borderless)
-                .help("Settings")
+                sportTabs
             }
-
-            Button(action: { NSApp.terminate(nil) }) {
-                Image(systemName: "power")
-                    .font(.system(size: 11))
-                    .foregroundColor(Color.white.opacity(0.35))
-            }
-            .buttonStyle(.borderless)
-            .help("Quit StravaBar")
         }
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
     }
 
-    // MARK: - Sport Tabs
+    // MARK: - Sport Tabs (icons only)
 
     private var sportTabs: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 6) {
-                ForEach(viewModel.availableSports) { sport in
-                    Button(action: { viewModel.selectedSport = sport }) {
-                        Text(sport.rawValue)
-                            .font(.system(size: 11, weight: viewModel.selectedSport == sport ? .semibold : .regular))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                viewModel.selectedSport == sport
-                                    ? Theme.accent.opacity(0.2)
-                                    : Color.white.opacity(0.05)
-                            )
-                            .foregroundColor(
-                                viewModel.selectedSport == sport
-                                    ? Theme.accent
-                                    : Color.white.opacity(0.5)
-                            )
-                            .cornerRadius(8)
-                    }
-                    .buttonStyle(.borderless)
+        HStack(spacing: 2) {
+            ForEach(viewModel.availableSports) { sport in
+                let selected = viewModel.selectedSport == sport
+                Button(action: { viewModel.selectedSport = sport }) {
+                    Image(systemName: sport.icon)
+                        .font(.system(size: 13, weight: selected ? .medium : .regular))
+                        .foregroundColor(selected ? Theme.ink : Theme.textTertiary)
+                        .frame(width: 30, height: 26)
+                        .background(selected ? Theme.cardRaised : Color.clear)
+                        .cornerRadius(7)
+                        .shadow(color: selected ? Color.black.opacity(0.06) : .clear, radius: 1, y: 1)
+                        .contentShape(Rectangle())
                 }
-            }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-        }
-    }
-
-    // MARK: - Sub-type Toggles
-
-    @ViewBuilder
-    private var subTypeToggles: some View {
-        if let sport = viewModel.selectedSport {
-            let subTypes = viewModel.subTypes(for: sport)
-            if subTypes.count > 1 {
-                ScrollView(.horizontal, showsIndicators: false) {
-                    HStack(spacing: 5) {
-                        ForEach(subTypes, id: \.self) { subType in
-                            let included = viewModel.isSubTypeIncluded(subType, sport: sport)
-                            Button(action: {
-                                viewModel.setSubType(subType, sport: sport, included: !included)
-                            }) {
-                                HStack(spacing: 4) {
-                                    Image(systemName: included ? "checkmark.square.fill" : "square")
-                                        .font(.system(size: 10))
-                                    Text(subTypeDisplayName(subType))
-                                        .font(.system(size: 10, weight: included ? .medium : .regular))
-                                }
-                                .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .foregroundColor(included ? Theme.accent : Color.white.opacity(0.35))
-                                .overlay(
-                                    RoundedRectangle(cornerRadius: 6)
-                                        .stroke(included ? Theme.accent.opacity(0.35) : Color.white.opacity(0.1), lineWidth: 1)
-                                )
-                            }
-                            .buttonStyle(.borderless)
-                            .help(included ? "Exclude \(subTypeDisplayName(subType))" : "Include \(subTypeDisplayName(subType))")
-                        }
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.bottom, 6)
-                }
+                .buttonStyle(.borderless)
+                .help(sport.rawValue)
             }
         }
+        .padding(2)
+        .background(Theme.card)
+        .cornerRadius(9)
     }
 
     // MARK: - Loading
@@ -183,10 +84,10 @@ struct PopoverView: View {
         VStack(spacing: 12) {
             Spacer()
             ProgressView()
-                .tint(Theme.accent)
+                .tint(Theme.textSecondary)
             Text("Loading activities...")
                 .font(.caption)
-                .foregroundColor(Color.white.opacity(0.4))
+                .foregroundColor(Theme.ink.opacity(0.4))
             Spacer()
         }
     }
@@ -194,92 +95,58 @@ struct PopoverView: View {
     // MARK: - Footer
 
     private var footerView: some View {
-        HStack {
-            if let lastUpdated = viewModel.lastUpdated {
-                Text("Updated \(lastUpdated.timeAgoDisplay())")
-                    .font(.system(size: 10))
-                    .foregroundColor(Color.white.opacity(0.25))
-            }
+        HStack(spacing: 12) {
+            syncStatusView
 
             Spacer()
 
-            Button("Disconnect") {
-                viewModel.disconnect()
+            Button(action: { Task { await viewModel.fetchAllData() } }) {
+                Image(systemName: "arrow.clockwise")
+            }
+            .buttonStyle(.borderless)
+            .disabled(viewModel.isLoading)
+            .help("Refresh data")
+
+            Button(action: { SettingsWindowController.shared.open(viewModel: viewModel) }) {
+                Image(systemName: "gearshape")
+            }
+            .buttonStyle(.borderless)
+            .help("Settings")
+
+            Button(action: { NSApp.terminate(nil) }) {
+                Image(systemName: "power")
+            }
+            .buttonStyle(.borderless)
+            .help("Quit StravaBar")
+        }
+        .font(.system(size: 11))
+        .foregroundColor(Theme.textTertiary)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 9)
+    }
+
+    @ViewBuilder
+    private var syncStatusView: some View {
+        if viewModel.isLoading {
+            HStack(spacing: 5) {
+                ProgressView()
+                    .scaleEffect(0.4)
+                    .frame(width: 10, height: 10)
+                Text(viewModel.syncStatus.description)
+                    .lineLimit(1)
             }
             .font(.system(size: 10))
-            .buttonStyle(.borderless)
-            .foregroundColor(Color(red: 1.0, green: 0.45, blue: 0.4))
+        } else if case .rateLimited = viewModel.syncStatus {
+            Label(viewModel.syncStatus.description, systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.gold)
+                .lineLimit(1)
+        } else if case .done = viewModel.syncStatus {
+            Label("Synced", systemImage: "checkmark")
+                .font(.system(size: 10))
+        } else if let lastUpdated = viewModel.lastUpdated {
+            Text("Updated \(lastUpdated.timeAgoDisplay())")
+                .font(.system(size: 10))
         }
-        .padding(.horizontal, 14)
-        .padding(.vertical, 8)
-    }
-}
-
-// MARK: - Per-Sport Goal Editor
-
-struct SportGoalRow: View {
-    let sport: SportCategory
-    @ObservedObject var settings: AppSettings
-    @ObservedObject var viewModel: StravaViewModel
-
-    @State private var distance: Double
-    @State private var elevation: Double
-    @State private var time: Double
-
-    init(sport: SportCategory, settings: AppSettings, viewModel: StravaViewModel) {
-        self.sport = sport
-        self.settings = settings
-        self.viewModel = viewModel
-        let goal = settings.goalFor(sport)
-        _distance = State(initialValue: goal.distanceMiles)
-        _elevation = State(initialValue: goal.elevationFeet)
-        _time = State(initialValue: goal.timeHours)
-    }
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack {
-                Text(sport.rawValue)
-                    .font(.caption)
-                    .fontWeight(.semibold)
-
-                if let last = viewModel.lastYearStats(for: sport) {
-                    Text("(\(viewModel.currentYear - 1): \(formatNumber(last.totalDistance)) \(settings.distanceUnit), \(formatNumber(last.totalElevation)) \(settings.elevationUnit), \(formatTime(last.totalTime)))")
-                        .font(.caption2)
-                        .foregroundColor(.secondary)
-                }
-            }
-
-            HStack(spacing: 6) {
-                TextField("0", value: $distance, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 60)
-                    .onChange(of: distance) { val in
-                        settings.setGoal(SportGoal(distanceMiles: val, elevationFeet: elevation, timeHours: time), for: sport)
-                    }
-                Text(settings.distanceUnit)
-                    .foregroundColor(.secondary)
-
-                TextField("0", value: $elevation, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 60)
-                    .onChange(of: elevation) { val in
-                        settings.setGoal(SportGoal(distanceMiles: distance, elevationFeet: val, timeHours: time), for: sport)
-                    }
-                Text(settings.elevationUnit)
-                    .foregroundColor(.secondary)
-
-                TextField("0", value: $time, format: .number)
-                    .textFieldStyle(.roundedBorder)
-                    .frame(width: 60)
-                    .onChange(of: time) { val in
-                        settings.setGoal(SportGoal(distanceMiles: distance, elevationFeet: elevation, timeHours: val), for: sport)
-                    }
-                Text("hrs")
-                    .foregroundColor(.secondary)
-            }
-            .font(.caption)
-        }
-        .padding(.vertical, 2)
     }
 }

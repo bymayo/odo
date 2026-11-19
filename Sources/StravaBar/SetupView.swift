@@ -10,15 +10,15 @@ struct SetupView: View {
 
             Image(systemName: "figure.run")
                 .font(.system(size: 36))
-                .foregroundColor(Theme.accent)
+                .foregroundColor(Theme.textSecondary)
 
             Text("Connect to Strava")
                 .font(.system(size: 16, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(Theme.ink)
 
             Text("Enter your Strava API credentials.\nCreate an app at strava.com/settings/api\nSet callback domain to \"localhost\"")
                 .font(.caption)
-                .foregroundColor(Color.white.opacity(0.4))
+                .foregroundColor(Theme.ink.opacity(0.4))
                 .multilineTextAlignment(.center)
                 .lineSpacing(2)
 
@@ -39,8 +39,9 @@ struct SetupView: View {
                 .font(.system(.body, weight: .medium))
                 .frame(maxWidth: .infinity)
                 .padding(.vertical, 8)
-                .background(settings.isConfigured ? Theme.accent : Color.gray.opacity(0.3))
-                .foregroundColor(.white)
+                // Strava's own brand orange — the one place it belongs
+                .background(settings.isConfigured ? Color(red: 0.99, green: 0.30, blue: 0.01) : Theme.ink.opacity(0.1))
+                .foregroundColor(settings.isConfigured ? .white : Theme.textTertiary)
                 .cornerRadius(10)
             }
             .buttonStyle(.borderless)
@@ -50,7 +51,7 @@ struct SetupView: View {
             if let error = viewModel.error {
                 Text(error)
                     .font(.caption)
-                    .foregroundColor(Color(red: 1.0, green: 0.45, blue: 0.4))
+                    .foregroundColor(Theme.negative)
                     .padding(.horizontal)
             }
 

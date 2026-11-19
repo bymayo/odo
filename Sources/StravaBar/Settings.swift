@@ -54,6 +54,11 @@ class AppSettings: ObservableObject {
         didSet { defaults.set(Array(excludedSubTypes), forKey: "excluded_sub_types") }
     }
 
+    // Tag filter modes per sport, keyed "Sport|Tag" -> TagMode raw value ("exclude"/"only")
+    @Published var tagModes: [String: String] {
+        didSet { defaults.set(tagModes, forKey: "tag_modes") }
+    }
+
     // Hidden sport names (user-toggled off)
     @Published var hiddenSports: Set<String> {
         didSet { defaults.set(Array(hiddenSports), forKey: "hidden_sports") }
@@ -109,6 +114,7 @@ class AppSettings: ObservableObject {
 
         hiddenSports = Set(defaults.stringArray(forKey: "hidden_sports") ?? [])
         excludedSubTypes = Set(defaults.stringArray(forKey: "excluded_sub_types") ?? [])
+        tagModes = (defaults.dictionary(forKey: "tag_modes") as? [String: String]) ?? [:]
 
         menuBarSport = defaults.string(forKey: "menu_bar_sport") ?? ""
         menuBarMetric = defaults.string(forKey: "menu_bar_metric") ?? "distance"
