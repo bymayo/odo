@@ -71,6 +71,9 @@ class AppSettings: ObservableObject {
     @Published var menuBarMetric: String {  // "distance" or "elevation"
         didSet { defaults.set(menuBarMetric, forKey: "menu_bar_metric") }
     }
+    @Published var menuBarShowPace: Bool {
+        didSet { defaults.set(menuBarShowPace, forKey: "menu_bar_show_pace") }
+    }
     @Published var menuBarShowGoal: Bool {
         didSet { defaults.set(menuBarShowGoal, forKey: "menu_bar_show_goal") }
     }
@@ -119,6 +122,7 @@ class AppSettings: ObservableObject {
         menuBarSport = defaults.string(forKey: "menu_bar_sport") ?? ""
         menuBarMetric = defaults.string(forKey: "menu_bar_metric") ?? "distance"
         menuBarShowGoal = defaults.bool(forKey: "menu_bar_show_goal")
+        menuBarShowPace = defaults.object(forKey: "menu_bar_show_pace") as? Bool ?? true
         useMetricUnits = defaults.bool(forKey: "use_metric_units")
 
         if refreshIntervalMinutes == 0 { refreshIntervalMinutes = 30 }

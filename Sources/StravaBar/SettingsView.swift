@@ -52,6 +52,11 @@ private struct GeneralSettings: View {
             HStack(spacing: 6) {
                 Image(systemName: viewModel.menuBarSportCategory?.icon ?? "figure.run")
                     .font(.system(size: 11))
+                if settings.menuBarShowPace, let onPace = viewModel.menuBarOnPace {
+                    Circle()
+                        .fill(onPace ? Color.green : Color.red)
+                        .frame(width: 5, height: 5)
+                }
                 Text(viewModel.menuBarText)
                     .font(.system(size: 12).monospacedDigit())
             }
@@ -88,6 +93,10 @@ private struct GeneralSettings: View {
             SettingsDivider()
             SettingsRow("Show goal", detail: "e.g. 3,326 / 5,200 mi") {
                 Toggle("", isOn: $settings.menuBarShowGoal).settingsSwitch()
+            }
+            SettingsDivider()
+            SettingsRow("Pace dot", detail: "Green when on pace, red when behind") {
+                Toggle("", isOn: $settings.menuBarShowPace).settingsSwitch()
             }
         }
 

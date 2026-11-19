@@ -23,7 +23,7 @@ struct PopoverView: View {
                 footerView
             }
         }
-        .frame(width: 360, height: 540)
+        .frame(width: 360, height: 720)
         .background(Theme.background)
     }
 

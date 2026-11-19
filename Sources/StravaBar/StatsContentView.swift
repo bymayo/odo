@@ -103,8 +103,34 @@ struct StatsContentView: View {
         .buttonStyle(.borderless)
     }
 
+    private func reached(_ metric: String, _ target: Double) -> Date? {
+        guard let sport = viewModel.selectedSport else { return nil }
+        return viewModel.goalReachedDate(sport: sport, metric: metric, goal: target)
+    }
+
+    /// Metric for the weekly card: distance, else elevation, else time
+    private func primaryMetric(_ goal: SportGoal) -> (metric: String, goal: Double, unit: String)? {
+        if goal.distanceMiles > 0 { return ("distance", goal.distanceMiles, settings.distanceUnit) }
+        if goal.elevationFeet > 0 { return ("elevation", goal.elevationFeet, settings.elevationUnit) }
+        if goal.timeHours > 0 { return ("time", goal.timeHours, "hrs") }
+        return nil
+    }
+
     @ViewBuilder
     private func goalsContent(stats: YearStats, goal: SportGoal) -> some View {
+            // This week, for the first goal that's set
+            if let sport = viewModel.selectedSport, let primary = primaryMetric(goal) {
+                let week = viewModel.currentWeek(sport: sport, metric: primary.metric)
+                let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
+                WeekProgressView(
+                    start: week.start,
+                    days: week.days,
+                    weeklyTarget: primary.goal / (daysInYear / 7),
+                    unit: primary.unit,
+                    useTimeFormat: primary.metric == "time"
+                )
+            }
+
             // Distance challenge
             if goal.distanceMiles > 0 {
                 ChallengeProgressView(
@@ -112,7 +138,8 @@ struct StatsContentView: View {
                     icon: "ruler",
                     current: stats.totalDistance,
                     goal: goal.distanceMiles,
-                    unit: settings.distanceUnit
+                    unit: settings.distanceUnit,
+                    reachedOn: reached("distance", goal.distanceMiles)
                 )
             }
 
@@ -123,7 +150,8 @@ struct StatsContentView: View {
                     icon: "arrow.up.right",
                     current: stats.totalElevation,
                     goal: goal.elevationFeet,
-                    unit: settings.elevationUnit
+                    unit: settings.elevationUnit,
+                    reachedOn: reached("elevation", goal.elevationFeet)
                 )
             }
 
@@ -135,7 +163,8 @@ struct StatsContentView: View {
                     current: stats.totalTime,
                     goal: goal.timeHours,
                     unit: "hrs",
-                    useTimeFormat: true
+                    useTimeFormat: true,
+                    reachedOn: reached("time", goal.timeHours)
                 )
             }
 

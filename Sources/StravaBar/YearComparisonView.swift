@@ -139,11 +139,24 @@ struct YearChart: View {
 
     private var selectedDay: Int { lockedDay ?? hoverDay ?? today }
 
-    /// Year with the highest total on the selected day
-    private var bestYear: Int? {
-        let ranked = series.compactMap { s in s.value(on: selectedDay).map { (s.year, $0) } }
-        guard let best = ranked.max(by: { $0.1 < $1.1 }), best.1 > 0 else { return nil }
-        return best.0
+    /// Podium on the selected day: year -> place (1, 2, 3)
+    private var podium: [Int: Int] {
+        let ranked = series
+            .compactMap { s in s.value(on: selectedDay).map { (s.year, $0) } }
+            .filter { $0.1 > 0 }
+            .sorted { $0.1 > $1.1 }
+            .prefix(3)
+        return Dictionary(uniqueKeysWithValues: ranked.enumerated().map { ($1.0, $0 + 1) })
+    }
+
+    private var bestYear: Int? { podium.first { $0.value == 1 }?.key }
+
+    private static func medalColor(_ place: Int) -> Color {
+        switch place {
+        case 1: return Theme.gold
+        case 2: return Theme.silver
+        default: return Theme.bronze
+        }
     }
 
     private func targetValue(on day: Int) -> Double {
@@ -361,10 +374,11 @@ struct YearChart: View {
                             Text(String(s.year))
                                 .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
                                 .foregroundColor(isCurrent || s.year == highlightedYear ? Theme.ink : Theme.textSecondary)
-                            if isBest {
+                            if let place = podium[s.year] {
                                 Image(systemName: "crown.fill")
                                     .font(.system(size: 7))
-                                    .foregroundColor(Theme.gold)
+                                    .foregroundColor(Self.medalColor(place))
+                                    .help(["1st", "2nd", "3rd"][place - 1] + " on this day")
                             }
                         }
                         .lineLimit(1)

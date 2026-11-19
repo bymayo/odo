@@ -18,6 +18,8 @@ enum Theme {
     static let positive = accent
     static let negative = dynamic(light: 0xC83A32, dark: 0xFF6B5F)
     static let gold = dynamic(light: 0xA66A11, dark: 0xE8B44A)
+    static let silver = dynamic(light: 0x8A9099, dark: 0xC4CAD3)
+    static let bronze = dynamic(light: 0x9A5B2E, dark: 0xC98A5A)
 
     static let textPrimary = ink
     static let textSecondary = ink.opacity(0.55)

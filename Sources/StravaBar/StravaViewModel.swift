@@ -139,6 +139,71 @@ class StravaViewModel: ObservableObject {
         return cumulative
     }
 
+    // MARK: - Goal insights
+
+    private func parseDate(_ string: String) -> Date? {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        if let d = f.date(from: string) { return d }
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f.date(from: string)
+    }
+
+    private func metricValue(_ a: StravaActivity, metric: String) -> Double {
+        switch metric {
+        case "elevation": return a.totalElevationGain * settings.elevationConversion
+        case "time": return Double(a.movingTime) / 3600.0
+        default: return a.distance * settings.distanceConversion
+        }
+    }
+
+    /// The day this year's total first reached `goal`, if it has
+    func goalReachedDate(sport: SportCategory, metric: String, goal: Double) -> Date? {
+        guard goal > 0 else { return nil }
+        let cumulative = cumulativeDaily(currentYear, sport: sport, metric: metric)
+        guard let day = cumulative.firstIndex(where: { $0 >= goal }), day > 0 else { return nil }
+        let cal = Calendar.current
+        return cal.date(from: DateComponents(year: currentYear, month: 1, day: 1))
+            .flatMap { cal.date(byAdding: .day, value: day - 1, to: $0) }
+    }
+
+    /// Totals for each day of the current week (locale's first weekday first)
+    func currentWeek(sport: SportCategory, metric: String) -> (start: Date, days: [Double]) {
+        let cal = Calendar.current
+        let interval = cal.dateInterval(of: .weekOfYear, for: Date())
+        let start = interval?.start ?? cal.startOfDay(for: Date())
+        var days = [Double](repeating: 0, count: 7)
+        // A week can span New Year, so look at both years
+        for year in [currentYear - 1, currentYear] {
+            for a in activities[year] ?? [] where includes(a, in: sport) {
+                guard let date = parseDate(a.startDate), date >= start,
+                      let index = cal.dateComponents([.day], from: start, to: cal.startOfDay(for: date)).day,
+                      (0..<7).contains(index) else { continue }
+                days[index] += metricValue(a, metric: metric)
+            }
+        }
+        return (start, days)
+    }
+
+    /// Menu bar sport/metric: true when on or ahead of pace, false when behind, nil with no goal
+    var menuBarOnPace: Bool? {
+        guard let sport = menuBarSportCategory else { return nil }
+        let goal = settings.goalFor(sport)
+        let metric = settings.menuBarMetric
+        let target: Double
+        switch metric {
+        case "elevation": target = goal.elevationFeet
+        case "time": target = goal.timeHours
+        default: target = goal.distanceMiles
+        }
+        guard target > 0 else { return nil }
+        let current = (activities[currentYear] ?? [])
+            .filter { includes($0, in: sport) }
+            .reduce(0.0) { $0 + metricValue($1, metric: metric) }
+        let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
+        return current >= target * Double(currentDayOfYear) / daysInYear
+    }
+
     // MARK: - Sub-type filtering
 
     private func subTypeKey(_ subType: String, sport: SportCategory) -> String {

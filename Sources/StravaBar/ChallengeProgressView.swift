@@ -7,6 +7,8 @@ struct ChallengeProgressView: View {
     let goal: Double
     let unit: String
     var useTimeFormat: Bool = false
+    /// Day the goal was reached this year (nil if not yet)
+    var reachedOn: Date? = nil
 
     private var progress: Double {
         guard goal > 0 else { return 0 }
@@ -84,6 +86,8 @@ struct ChallengeProgressView: View {
                 stat(fmt(goal), "Goal")
             }
 
+            forecastLine
+
             // Only when behind pace
             if aheadBehind < 0 && current < goal {
                 weeklyCallout
@@ -93,6 +97,65 @@ struct ChallengeProgressView: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Theme.card)
         .cornerRadius(14)
+    }
+
+    // MARK: - Finish date forecast
+
+    private var yearEnd: Date {
+        let cal = Calendar.current
+        let year = cal.component(.year, from: Date())
+        return cal.date(from: DateComponents(year: year, month: 12, day: 31)) ?? Date()
+    }
+
+    /// Date you'd reach the goal at your current average daily rate
+    private var forecastDate: Date? {
+        guard current > 0, current < goal else { return nil }
+        let perDay = current / dayOfYear
+        let daysNeeded = (goal - current) / perDay
+        guard daysNeeded.isFinite, daysNeeded < 365 * 20 else { return nil }
+        return Calendar.current.date(byAdding: .day, value: Int(daysNeeded.rounded(.up)), to: Date())
+    }
+
+    private func dateText(_ date: Date) -> String {
+        let cal = Calendar.current
+        let f = DateFormatter()
+        f.dateFormat = cal.component(.year, from: date) == cal.component(.year, from: Date()) ? "d MMM" : "d MMM yyyy"
+        return f.string(from: date)
+    }
+
+    /// "+12 days early" / "26 days late" relative to 31 Dec
+    private func earlyLate(_ date: Date) -> (String, Bool) {
+        let cal = Calendar.current
+        let days = cal.dateComponents([.day], from: cal.startOfDay(for: date), to: cal.startOfDay(for: yearEnd)).day ?? 0
+        if days == 0 { return ("right on time", true) }
+        return days > 0 ? ("\(days) days early", true) : ("\(-days) days late", false)
+    }
+
+    @ViewBuilder
+    private var forecastLine: some View {
+        if let reachedOn {
+            let (label, _) = earlyLate(reachedOn)
+            forecastRow(icon: "flag.checkered", lead: "Hit on \(dateText(reachedOn))", tail: label, good: true)
+        } else if let date = forecastDate {
+            let (label, good) = earlyLate(date)
+            forecastRow(icon: "flag.checkered", lead: "At this rate, \(dateText(date))", tail: label, good: good)
+        }
+    }
+
+    private func forecastRow(icon: String, lead: String, tail: String, good: Bool) -> some View {
+        HStack(spacing: 6) {
+            Image(systemName: icon)
+                .font(.system(size: 10))
+                .foregroundColor(Theme.textTertiary)
+            Text(lead)
+                .font(.system(size: 11, weight: .medium))
+                .foregroundColor(Theme.ink.opacity(0.8))
+            Text("· \(tail)")
+                .font(.system(size: 11))
+                .foregroundColor(good ? Theme.positive : Theme.negative)
+            Spacer(minLength: 0)
+        }
+        .help("Based on your average so far this year")
     }
 
     // MARK: - Weekly target

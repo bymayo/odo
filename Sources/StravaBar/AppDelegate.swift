@@ -53,7 +53,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 360, height: 540)
+        popover.contentSize = NSSize(width: 360, height: 720)
         popover.behavior = .transient
         popover.contentViewController = NSHostingController(
             rootView: PopoverView(viewModel: viewModel)
@@ -127,6 +127,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             statusItem.button?.title = " —"
             return
         }
-        statusItem.button?.title = " \(viewModel.menuBarText)"
+        guard let button = statusItem.button else { return }
+
+        // Icon follows the menu bar sport
+        if let icon = viewModel.menuBarSportCategory?.icon,
+           let image = NSImage(systemSymbolName: icon, accessibilityDescription: "StravaBar") {
+            image.isTemplate = true
+            button.image = image
+        }
+
+        let font = NSFont.menuBarFont(ofSize: 0)
+        let title = NSMutableAttributedString(string: " ", attributes: [.font: font])
+
+        // Pace dot: green on/ahead of pace, red behind
+        if AppSettings.shared.menuBarShowPace, let onPace = viewModel.menuBarOnPace {
+            title.append(NSAttributedString(string: "●", attributes: [
+                .font: NSFont.systemFont(ofSize: 7),
+                .foregroundColor: onPace ? NSColor.systemGreen : NSColor.systemRed,
+                .baselineOffset: 2,
+            ]))
+            title.append(NSAttributedString(string: " ", attributes: [.font: font]))
+        }
+
+        title.append(NSAttributedString(string: viewModel.menuBarText, attributes: [.font: font]))
+        button.attributedTitle = title
     }
 }
