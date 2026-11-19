@@ -49,6 +49,11 @@ class AppSettings: ObservableObject {
         didSet { defaults.set(refreshIntervalMinutes, forKey: "refresh_interval_minutes") }
     }
 
+    // Excluded sub-types per sport, keyed "Sport|subType" (e.g. "Cycling|VirtualRide")
+    @Published var excludedSubTypes: Set<String> {
+        didSet { defaults.set(Array(excludedSubTypes), forKey: "excluded_sub_types") }
+    }
+
     // Hidden sport names (user-toggled off)
     @Published var hiddenSports: Set<String> {
         didSet { defaults.set(Array(hiddenSports), forKey: "hidden_sports") }
@@ -103,6 +108,7 @@ class AppSettings: ObservableObject {
         }
 
         hiddenSports = Set(defaults.stringArray(forKey: "hidden_sports") ?? [])
+        excludedSubTypes = Set(defaults.stringArray(forKey: "excluded_sub_types") ?? [])
 
         menuBarSport = defaults.string(forKey: "menu_bar_sport") ?? ""
         menuBarMetric = defaults.string(forKey: "menu_bar_metric") ?? "distance"

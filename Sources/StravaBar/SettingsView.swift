@@ -3,6 +3,8 @@ import SwiftUI
 struct SettingsView: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings = AppSettings.shared
+    @State private var launchAtLogin = LaunchAtLogin.isEnabled
+    @State private var launchAtLoginError: String?
 
     var body: some View {
         ScrollView {
@@ -159,6 +161,26 @@ struct SettingsView: View {
                     .onChange(of: settings.refreshIntervalMinutes) { _ in
                         viewModel.startRefreshTimer()
                     }
+                }
+
+                Toggle("Launch at startup", isOn: Binding(
+                    get: { launchAtLogin },
+                    set: { enabled in
+                        do {
+                            try LaunchAtLogin.setEnabled(enabled)
+                            launchAtLoginError = nil
+                        } catch {
+                            launchAtLoginError = error.localizedDescription
+                        }
+                        launchAtLogin = LaunchAtLogin.isEnabled
+                    }
+                ))
+                .font(.caption)
+
+                if let launchAtLoginError {
+                    Text(launchAtLoginError)
+                        .font(.caption2)
+                        .foregroundColor(.red)
                 }
             }
             .padding()

@@ -5,7 +5,11 @@ import SwiftUI
 private struct ActivityCache: Codable {
     let activities: [Int: [StravaActivity]]
     let lastUpdated: Date
+    var version: Int? = nil
 }
+
+/// Bump when StravaActivity gains fields, so cached years get re-fetched
+private let kCacheVersion = 2
 
 @MainActor
 class StravaViewModel: ObservableObject {
@@ -22,6 +26,9 @@ class StravaViewModel: ObservableObject {
     @Published var lastUpdated: Date?
     @Published var detectedSports: [SportCategory] = []
     @Published var availableSports: [SportCategory] = []
+
+    /// Cached years fetched with an older cache version; re-fetched on next sync
+    private var staleYears: Set<Int> = []
 
     private static var cacheURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -64,7 +71,7 @@ class StravaViewModel: ObservableObject {
             return YearStats(year: year)
         }
 
-        let filtered = yearActivities.filter { sport.matches(sportType: $0.sportType) }
+        let filtered = yearActivities.filter { includes($0, in: sport) }
 
         let calendar = Calendar.current
         let iso8601 = ISO8601DateFormatter()
@@ -100,6 +107,74 @@ class StravaViewModel: ObservableObject {
         return stats
     }
 
+    /// Cumulative daily totals for a metric. Index = day of year (0 = before Jan 1).
+    /// Past years run to Dec 31; the current year stops at today.
+    func cumulativeDaily(_ year: Int, sport: SportCategory, metric: String) -> [Double] {
+        let calendar = Calendar.current
+        let iso8601 = ISO8601DateFormatter()
+        iso8601.formatOptions = [.withInternetDateTime]
+        let iso8601Frac = ISO8601DateFormatter()
+        iso8601Frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let daysInYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))
+            .flatMap { calendar.range(of: .day, in: .year, for: $0)?.count } ?? 365
+        let lastDay = year == currentYear ? currentDayOfYear : daysInYear
+
+        var daily = [Double](repeating: 0, count: daysInYear + 1)
+        for activity in activities[year] ?? [] where includes(activity, in: sport) {
+            guard let date = iso8601.date(from: activity.startDate) ?? iso8601Frac.date(from: activity.startDate),
+                  let day = calendar.ordinality(of: .day, in: .year, for: date),
+                  day <= daysInYear else { continue }
+            switch metric {
+            case "elevation": daily[day] += activity.totalElevationGain * settings.elevationConversion
+            case "time": daily[day] += Double(activity.movingTime) / 3600.0
+            default: daily[day] += activity.distance * settings.distanceConversion
+            }
+        }
+
+        var cumulative = [Double](repeating: 0, count: lastDay + 1)
+        for day in 1...lastDay {
+            cumulative[day] = cumulative[day - 1] + daily[day]
+        }
+        return cumulative
+    }
+
+    // MARK: - Sub-type filtering
+
+    private func subTypeKey(_ subType: String, sport: SportCategory) -> String {
+        "\(sport.rawValue)|\(subType)"
+    }
+
+    func includes(_ activity: StravaActivity, in sport: SportCategory) -> Bool {
+        sport.matches(sportType: activity.sportType)
+            && !settings.excludedSubTypes.contains(subTypeKey(activity.subType, sport: sport))
+    }
+
+    /// Sub-types seen for a sport across all years, most common first
+    func subTypes(for sport: SportCategory) -> [String] {
+        var counts: [String: Int] = [:]
+        for yearActivities in activities.values {
+            for a in yearActivities where sport.matches(sportType: a.sportType) {
+                counts[a.subType, default: 0] += 1
+            }
+        }
+        return counts.sorted { $0.value != $1.value ? $0.value > $1.value : $0.key < $1.key }.map(\.key)
+    }
+
+    func isSubTypeIncluded(_ subType: String, sport: SportCategory) -> Bool {
+        !settings.excludedSubTypes.contains(subTypeKey(subType, sport: sport))
+    }
+
+    func setSubType(_ subType: String, sport: SportCategory, included: Bool) {
+        objectWillChange.send()
+        let key = subTypeKey(subType, sport: sport)
+        if included {
+            settings.excludedSubTypes.remove(key)
+        } else {
+            settings.excludedSubTypes.insert(key)
+        }
+    }
+
     var currentYearStats: YearStats {
         guard let sport = selectedSport else { return YearStats(year: currentYear) }
         return statsForYear(currentYear, sport: sport)
@@ -119,7 +194,7 @@ class StravaViewModel: ObservableObject {
               let sport = menuBarSportCategory else { return "—" }
 
         let metric = settings.menuBarMetric
-        let filtered = yearActivities.filter { sport.matches(sportType: $0.sportType) }
+        let filtered = yearActivities.filter { includes($0, in: sport) }
 
         let value: Double
         let unit: String
@@ -164,11 +239,18 @@ class StravaViewModel: ObservableObject {
         }
         activities = cache.activities
         lastUpdated = cache.lastUpdated
+        if (cache.version ?? 1) < kCacheVersion {
+            staleYears = Set(cache.activities.keys)
+        }
         updateAvailableSports()
     }
 
     private func saveCache() {
-        let cache = ActivityCache(activities: activities, lastUpdated: lastUpdated ?? Date())
+        let cache = ActivityCache(
+            activities: activities,
+            lastUpdated: lastUpdated ?? Date(),
+            version: staleYears.isEmpty ? kCacheVersion : 1
+        )
         if let data = try? JSONEncoder().encode(cache) {
             try? data.write(to: Self.cacheURL, options: .atomic)
         }
@@ -224,7 +306,7 @@ class StravaViewModel: ObservableObject {
             var yearsToFetch: [Int] = [currentYear]
             var tempEmpty = 0
             for year in stride(from: currentYear - 1, through: 2000, by: -1) {
-                if activities[year] != nil {
+                if activities[year] != nil && !staleYears.contains(year) {
                     tempEmpty = 0
                     continue
                 }
@@ -241,6 +323,7 @@ class StravaViewModel: ObservableObject {
             do {
                 let yearActivities = try await api.fetchActivities(year: currentYear, accessToken: token)
                 activities[currentYear] = yearActivities
+                staleYears.remove(currentYear)
                 completed += 1
             } catch let err as StravaError {
                 if case .rateLimited(let retry) = err {
@@ -260,7 +343,7 @@ class StravaViewModel: ObservableObject {
             // Walk backwards until we hit 3 consecutive empty years.
             var consecutiveEmpty = 0
             for year in stride(from: currentYear - 1, through: 2000, by: -1) {
-                if activities[year] != nil {
+                if activities[year] != nil && !staleYears.contains(year) {
                     // Already cached — skip
                     consecutiveEmpty = 0
                     continue
@@ -270,6 +353,7 @@ class StravaViewModel: ObservableObject {
 
                 do {
                     let yearActivities = try await api.fetchActivities(year: year, accessToken: token)
+                    staleYears.remove(year)
                     completed += 1
                     if yearActivities.isEmpty {
                         consecutiveEmpty += 1

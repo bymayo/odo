@@ -41,9 +41,13 @@ struct StravaActivity: Codable {
     let sportType: String
     let startDate: String
     let movingTime: Int
+    let commute: Bool?
+
+    /// Finer-grained type used for filtering within a sport (commutes split out)
+    var subType: String { commute == true ? "Commute" : sportType }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, distance
+        case id, name, distance, commute
         case totalElevationGain = "total_elevation_gain"
         case sportType = "sport_type"
         case startDate = "start_date"
@@ -129,6 +133,18 @@ enum SportCategory: Identifiable, Hashable {
         case .sport(let name): return Self.from(sportType: sportType) == .sport(name)
         }
     }
+}
+
+/// "VirtualRide" -> "Virtual Ride", "EBikeRide" -> "E-Bike Ride"
+func subTypeDisplayName(_ subType: String) -> String {
+    let special = ["EBikeRide": "E-Bike Ride", "EMountainBikeRide": "E-MTB Ride", "HighIntensityIntervalTraining": "HIIT"]
+    if let name = special[subType] { return name }
+    var result = ""
+    for (i, ch) in subType.enumerated() {
+        if i > 0 && ch.isUppercase { result.append(" ") }
+        result.append(ch)
+    }
+    return result
 }
 
 // MARK: - Per-Sport Goals

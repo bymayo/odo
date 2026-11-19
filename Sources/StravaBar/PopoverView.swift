@@ -14,6 +14,7 @@ struct PopoverView: View {
                 loadingView
             } else {
                 sportTabs
+                subTypeToggles
 
                 ScrollView {
                     StatsContentView(viewModel: viewModel)
@@ -134,6 +135,45 @@ struct PopoverView: View {
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 8)
+        }
+    }
+
+    // MARK: - Sub-type Toggles
+
+    @ViewBuilder
+    private var subTypeToggles: some View {
+        if let sport = viewModel.selectedSport {
+            let subTypes = viewModel.subTypes(for: sport)
+            if subTypes.count > 1 {
+                ScrollView(.horizontal, showsIndicators: false) {
+                    HStack(spacing: 5) {
+                        ForEach(subTypes, id: \.self) { subType in
+                            let included = viewModel.isSubTypeIncluded(subType, sport: sport)
+                            Button(action: {
+                                viewModel.setSubType(subType, sport: sport, included: !included)
+                            }) {
+                                HStack(spacing: 4) {
+                                    Image(systemName: included ? "checkmark.square.fill" : "square")
+                                        .font(.system(size: 10))
+                                    Text(subTypeDisplayName(subType))
+                                        .font(.system(size: 10, weight: included ? .medium : .regular))
+                                }
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .foregroundColor(included ? Theme.accent : Color.white.opacity(0.35))
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .stroke(included ? Theme.accent.opacity(0.35) : Color.white.opacity(0.1), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.borderless)
+                            .help(included ? "Exclude \(subTypeDisplayName(subType))" : "Include \(subTypeDisplayName(subType))")
+                        }
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 6)
+                }
+            }
         }
     }
 
