@@ -122,12 +122,16 @@ struct StatsContentView: View {
             if let sport = viewModel.selectedSport, let primary = primaryMetric(goal) {
                 let week = viewModel.currentWeek(sport: sport, metric: primary.metric)
                 let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
+                let weeklyTarget = primary.goal / (daysInYear / 7)
+                let streaks = viewModel.streaks(sport: sport, metric: primary.metric, weeklyTarget: weeklyTarget)
                 WeekProgressView(
                     start: week.start,
                     days: week.days,
-                    weeklyTarget: primary.goal / (daysInYear / 7),
+                    weeklyTarget: weeklyTarget,
                     unit: primary.unit,
-                    useTimeFormat: primary.metric == "time"
+                    useTimeFormat: primary.metric == "time",
+                    streak: streaks.current,
+                    bestStreak: streaks.best
                 )
             }
 
@@ -172,12 +176,29 @@ struct StatsContentView: View {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {
-                        Text("No challenge set")
-                            .font(.caption)
-                            .foregroundColor(Theme.ink.opacity(0.4))
-                        Text("Set goals in settings")
-                            .font(.caption2)
-                            .foregroundColor(Theme.ink.opacity(0.25))
+                        Text("No goals set")
+                            .font(.system(size: 13, weight: .medium))
+                            .foregroundColor(Theme.textSecondary)
+                        if let sport = viewModel.selectedSport, !viewModel.smartSuggestions(for: sport).isEmpty {
+                            Button(action: { viewModel.applyDefaultSmartGoals(for: sport) }) {
+                                Label("Suggest goals", systemImage: "sparkles")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                    .foregroundColor(Theme.background)
+                                    .background(Theme.ink)
+                                    .cornerRadius(8)
+                            }
+                            .buttonStyle(.borderless)
+                            .padding(.top, 4)
+                            Text("Beats your recent years by \(settings.smartBeatPercent)% · change in Settings")
+                                .font(.system(size: 10))
+                                .foregroundColor(Theme.textTertiary)
+                        } else {
+                            Text("Set goals in Settings")
+                                .font(.system(size: 11))
+                                .foregroundColor(Theme.textTertiary)
+                        }
                     }
                     Spacer()
                 }

@@ -71,6 +71,14 @@ class AppSettings: ObservableObject {
     @Published var menuBarMetric: String {  // "distance" or "elevation"
         didSet { defaults.set(menuBarMetric, forKey: "menu_bar_metric") }
     }
+    // Smart goal percentages
+    @Published var smartBeatPercent: Int {
+        didSet { defaults.set(smartBeatPercent, forKey: "smart_beat_percent") }
+    }
+    @Published var smartStretchPercent: Int {
+        didSet { defaults.set(smartStretchPercent, forKey: "smart_stretch_percent") }
+    }
+
     @Published var menuBarShowPace: Bool {
         didSet { defaults.set(menuBarShowPace, forKey: "menu_bar_show_pace") }
     }
@@ -123,6 +131,8 @@ class AppSettings: ObservableObject {
         menuBarMetric = defaults.string(forKey: "menu_bar_metric") ?? "distance"
         menuBarShowGoal = defaults.bool(forKey: "menu_bar_show_goal")
         menuBarShowPace = defaults.object(forKey: "menu_bar_show_pace") as? Bool ?? true
+        smartBeatPercent = defaults.object(forKey: "smart_beat_percent") as? Int ?? 5
+        smartStretchPercent = defaults.object(forKey: "smart_stretch_percent") as? Int ?? 12
         useMetricUnits = defaults.bool(forKey: "use_metric_units")
 
         if refreshIntervalMinutes == 0 { refreshIntervalMinutes = 30 }

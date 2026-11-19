@@ -1,9 +1,9 @@
 import Foundation
 
-/// Launch-at-login via a per-user LaunchAgent. StravaBar runs as a bare executable
+/// Launch-at-login via a per-user LaunchAgent. Odo runs as a bare executable
 /// (not an .app bundle), so SMAppService isn't available.
 enum LaunchAtLogin {
-    private static let label = "uk.co.bymayo.stravabar"
+    static let label = "uk.co.bymayo.odo"
 
     private static var plistURL: URL {
         FileManager.default.homeDirectoryForCurrentUser
@@ -18,7 +18,7 @@ enum LaunchAtLogin {
         if enabled {
             guard let executable = Bundle.main.executableURL?.resolvingSymlinksInPath().path else {
                 throw NSError(domain: label, code: 1,
-                              userInfo: [NSLocalizedDescriptionKey: "Couldn't find the StravaBar executable"])
+                              userInfo: [NSLocalizedDescriptionKey: "Couldn't find the Odo executable"])
             }
             let plist: [String: Any] = [
                 "Label": label,

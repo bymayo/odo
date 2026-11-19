@@ -38,7 +38,7 @@ struct PopoverView: View {
                     .frame(width: 26, height: 26)
                     .background(Theme.card)
                     .cornerRadius(7)
-                Text("StravaBar")
+                Text("Odo")
                     .font(.system(size: 14, weight: .medium))
                     .foregroundColor(Theme.ink)
             }
@@ -117,7 +117,7 @@ struct PopoverView: View {
                 Image(systemName: "power")
             }
             .buttonStyle(.borderless)
-            .help("Quit StravaBar")
+            .help("Quit Odo")
         }
         .font(.system(size: 11))
         .foregroundColor(Theme.textTertiary)

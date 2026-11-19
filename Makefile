@@ -1,6 +1,6 @@
 .PHONY: build run release clean open
 
-APP_NAME = StravaBar
+APP_NAME = Odo
 BUILD_DIR = .build
 
 ## Build debug binary

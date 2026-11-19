@@ -8,6 +8,8 @@ struct WeekProgressView: View {
     let weeklyTarget: Double    // yearly goal spread over the weeks
     let unit: String
     var useTimeFormat: Bool = false
+    var streak: Int = 0
+    var bestStreak: Int = 0
 
     private var total: Double { days.reduce(0, +) }
     private var progress: Double { weeklyTarget > 0 ? min(total / weeklyTarget, 1) : 0 }
@@ -81,10 +83,37 @@ struct WeekProgressView: View {
                     .help(i <= todayIndex ? "\(fmt(days[i])) \(useTimeFormat ? "" : unit)" : "")
                 }
             }
+
+            streakRow
         }
         .padding(16)
         .background(Theme.card)
         .cornerRadius(14)
+    }
+
+    private var streakRow: some View {
+        HStack(spacing: 6) {
+            Image(systemName: streak > 0 ? "flame.fill" : "flame")
+                .font(.system(size: 11))
+                .foregroundColor(streak > 0 ? Theme.gold : Theme.textTertiary)
+            if streak > 0 {
+                (Text("\(streak)-week streak")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(Theme.ink)
+                 + Text(streak >= bestStreak ? " · best this year" : " · best \(bestStreak)")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textTertiary))
+            } else {
+                Text(bestStreak > 0
+                     ? "Hit \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit) this week to restart your streak · best \(bestStreak)"
+                     : "Hit \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit) this week to start a streak")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textTertiary)
+            }
+            Spacer(minLength: 0)
+        }
+        .padding(.top, 2)
+        .help("Weeks in a row hitting your weekly pace")
     }
 
     @ViewBuilder

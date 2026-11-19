@@ -44,7 +44,7 @@ class StravaAuth {
                 let html = code != nil
                     ? "<html><body style='font-family:-apple-system,system-ui;text-align:center;padding:60px'>"
                       + "<h1 style='color:#FC4C02'>Connected!</h1>"
-                      + "<p style='color:#666'>You can close this window and return to StravaBar.</p></body></html>"
+                      + "<p style='color:#666'>You can close this window and return to Odo.</p></body></html>"
                     : "<html><body style='font-family:-apple-system,system-ui;text-align:center;padding:60px'>"
                       + "<h1 style='color:#d00'>Error</h1>"
                       + "<p>Authorization failed. Please try again.</p></body></html>"

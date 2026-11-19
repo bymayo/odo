@@ -32,7 +32,7 @@ class StravaViewModel: ObservableObject {
 
     private static var cacheURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
-        let dir = support.appendingPathComponent("StravaBar", isDirectory: true)
+        let dir = support.appendingPathComponent("Odo", isDirectory: true)
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         return dir.appendingPathComponent("activity_cache.json")
     }
@@ -183,6 +183,44 @@ class StravaViewModel: ObservableObject {
             }
         }
         return (start, days)
+    }
+
+    /// Weekly streaks: consecutive weeks hitting `weeklyTarget`.
+    /// The current week only counts once it's hit, so an in-progress week never breaks a streak.
+    func streaks(sport: SportCategory, metric: String, weeklyTarget: Double) -> (current: Int, best: Int) {
+        guard weeklyTarget > 0 else { return (0, 0) }
+        let cal = Calendar.current
+        func weekStart(_ d: Date) -> Date { cal.dateInterval(of: .weekOfYear, for: d)?.start ?? cal.startOfDay(for: d) }
+
+        var totals: [Date: Double] = [:]
+        for year in (currentYear - 2)...currentYear {
+            for a in activities[year] ?? [] where includes(a, in: sport) {
+                guard let date = parseDate(a.startDate) else { continue }
+                totals[weekStart(date), default: 0] += metricValue(a, metric: metric)
+            }
+        }
+        func hit(_ week: Date) -> Bool { (totals[week] ?? 0) >= weeklyTarget }
+
+        let thisWeek = weekStart(Date())
+
+        // Current streak: walk back from this week (if hit) or last week
+        var current = 0
+        var week = hit(thisWeek) ? thisWeek : cal.date(byAdding: .weekOfYear, value: -1, to: thisWeek)!
+        while hit(week), current < 520 {
+            current += 1
+            week = cal.date(byAdding: .weekOfYear, value: -1, to: week)!
+        }
+
+        // Best streak this year
+        var best = 0, run = 0
+        let yearStart = cal.date(from: DateComponents(year: currentYear, month: 1, day: 1))!
+        week = weekStart(yearStart)
+        while week <= thisWeek {
+            run = hit(week) ? run + 1 : (week == thisWeek ? run : 0)
+            best = max(best, run)
+            week = cal.date(byAdding: .weekOfYear, value: 1, to: week)!
+        }
+        return (current, max(best, current))
     }
 
     /// Menu bar sport/metric: true when on or ahead of pace, false when behind, nil with no goal
@@ -604,26 +642,14 @@ class StravaViewModel: ObservableObject {
         return stats
     }
 
-    /// Pre-fill goals from last year's data for any sport that has no goal set yet
+    /// Pre-fill goals for any sport with none set, using the smart "Beat" suggestion
     func prefillGoalsFromLastYear() {
-        var changed = false
         for sport in availableSports {
             let existing = settings.goalFor(sport)
-            if existing.distanceMiles == 0 && existing.elevationFeet == 0 && existing.timeHours == 0 {
-                if let last = lastYearStats(for: sport) {
-                    // Round up to a clean number (different rounding for metric vs imperial)
-                    let distRound: Double = settings.useMetricUnits ? 100 : 100
-                    let elevRound: Double = settings.useMetricUnits ? 500 : 1000
-                    let dist = (last.totalDistance / distRound).rounded(.up) * distRound
-                    let elev = (last.totalElevation / elevRound).rounded(.up) * elevRound
-                    let time = (last.totalTime / 10).rounded(.up) * 10
-                    settings.setGoal(SportGoal(distanceMiles: dist, elevationFeet: elev, timeHours: time), for: sport)
-                    changed = true
-                }
+            if existing.distanceMiles == 0 && existing.elevationFeet == 0 && existing.timeHours == 0,
+               lastYearStats(for: sport) != nil {
+                applyDefaultSmartGoals(for: sport)
             }
-        }
-        if changed {
-            objectWillChange.send()
         }
     }
 

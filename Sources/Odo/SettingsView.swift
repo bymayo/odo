@@ -153,6 +153,8 @@ private struct GoalsSettings: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings: AppSettings
     @State private var selected: SportCategory?
+    @State private var showSmart = false
+    @State private var goalVersion = 0
 
     private var sport: SportCategory? { selected ?? viewModel.availableSports.first }
 
@@ -176,8 +178,35 @@ private struct GoalsSettings: View {
                 ))
             }
 
+            Button(action: { withAnimation(.easeOut(duration: 0.15)) { showSmart.toggle() } }) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                    Text(showSmart ? "Hide suggestions" : "Suggest smart goals")
+                    Spacer()
+                    Image(systemName: showSmart ? "chevron.up" : "chevron.down")
+                        .font(.system(size: 9, weight: .semibold))
+                }
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Theme.ink)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background(Theme.card)
+                .cornerRadius(10)
+                .contentShape(Rectangle())
+            }
+            .buttonStyle(.borderless)
+
+            if showSmart {
+                SmartGoalsPanel(viewModel: viewModel, settings: settings, sport: sport) {
+                    goalVersion += 1
+                    withAnimation(.easeOut(duration: 0.15)) { showSmart = false }
+                }
+                .id(sport)
+                .transition(.opacity)
+            }
+
             GoalEditor(sport: sport, settings: settings, viewModel: viewModel)
-                .id(sport) // reset field state when switching sport
+                .id("\(sport.rawValue)-\(goalVersion)") // reset fields on sport switch or after applying
         }
     }
 }

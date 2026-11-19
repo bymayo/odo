@@ -16,7 +16,7 @@ class SettingsWindowController {
         let hostingController = NSHostingController(rootView: settingsView)
 
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "StravaBar Settings"
+        window.title = "Odo Settings"
         window.styleMask = [.titled, .closable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
@@ -39,13 +39,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var refreshTimer: Timer?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        LegacyMigration.run() // before anything reads settings
         setupMainMenu()
         viewModel = StravaViewModel()
 
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "figure.run", accessibilityDescription: "StravaBar")
+            button.image = NSImage(systemSymbolName: "figure.run", accessibilityDescription: "Odo")
             button.imagePosition = .imageLeading
             button.title = " —"
             button.action = #selector(togglePopover)
@@ -131,7 +132,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Icon follows the menu bar sport
         if let icon = viewModel.menuBarSportCategory?.icon,
-           let image = NSImage(systemSymbolName: icon, accessibilityDescription: "StravaBar") {
+           let image = NSImage(systemSymbolName: icon, accessibilityDescription: "Odo") {
             image.isTemplate = true
             button.image = image
         }
