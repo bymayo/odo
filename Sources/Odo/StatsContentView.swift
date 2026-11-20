@@ -116,10 +116,57 @@ struct StatsContentView: View {
         return nil
     }
 
+    private var weeksInYear: Double {
+        Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365) / 7
+    }
+
+    /// The All tab's week: the combined total (against All's own goal if it
+    /// has one, else time, which adds up fairly across sports), then each
+    /// sport against its own weekly pace
+    private func allWeek(goal: SportGoal) -> some View {
+        let primary = primaryMetric(goal)
+        let metric = primary?.metric ?? "time"
+        let weeklyTarget = (primary?.goal ?? 0) / weeksInYear
+        let week = viewModel.currentWeek(sport: .all, metric: metric)
+        let streaks = weeklyTarget > 0
+            ? viewModel.streaks(sport: .all, metric: metric, weeklyTarget: weeklyTarget)
+            : (current: 0, best: 0)
+
+        let breakdown: [SportWeek] = viewModel.availableSports.compactMap { sport in
+            guard sport != .all else { return nil }
+            let own = primaryMetric(settings.goalFor(sport))
+            let m = own?.metric ?? metric
+            let total = viewModel.currentWeek(sport: sport, metric: m).days.reduce(0, +)
+            // Skip sports with no goal and nothing done this week
+            guard own != nil || total > 0 else { return nil }
+            return SportWeek(
+                sport: sport,
+                total: total,
+                target: (own?.goal ?? 0) / weeksInYear,
+                unit: own?.unit ?? (m == "time" ? "hrs" : primary?.unit ?? ""),
+                useTimeFormat: m == "time"
+            )
+        }
+
+        return WeekProgressView(
+            start: week.start,
+            days: week.days,
+            weeklyTarget: weeklyTarget,
+            unit: primary?.unit ?? "hrs",
+            useTimeFormat: metric == "time",
+            streak: streaks.current,
+            bestStreak: streaks.best,
+            breakdown: breakdown
+        )
+    }
+
     @ViewBuilder
     private func goalsContent(stats: YearStats, goal: SportGoal) -> some View {
-            // This week, for the first goal that's set
-            if let sport = viewModel.selectedSport, let primary = primaryMetric(goal) {
+            // This week, for the first goal that's set. All always gets one,
+            // broken down by sport
+            if viewModel.selectedSport == .all {
+                allWeek(goal: goal)
+            } else if let sport = viewModel.selectedSport, let primary = primaryMetric(goal) {
                 let week = viewModel.currentWeek(sport: sport, metric: primary.metric)
                 let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
                 let weeklyTarget = primary.goal / (daysInYear / 7)

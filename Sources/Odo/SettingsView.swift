@@ -72,6 +72,9 @@ private struct GeneralSettings: View {
 
             SettingsRow("Sport") {
                 Picker("", selection: $settings.menuBarSport) {
+                    if viewModel.detectedSports.count > 1 {
+                        Text(SportCategory.all.displayName).tag(SportCategory.all.rawValue)
+                    }
                     ForEach(viewModel.detectedSports) { sport in
                         Text(sport.rawValue).tag(sport.rawValue)
                     }
@@ -193,7 +196,9 @@ private struct GoalsSettings: View {
     @State private var showSmart = false
     @State private var goalVersion = 0
 
-    private var sport: SportCategory? { selected ?? viewModel.availableSports.first }
+    private var sport: SportCategory? {
+        selected ?? viewModel.availableSports.first { $0 != .all } ?? viewModel.availableSports.first
+    }
 
     var body: some View {
         if viewModel.availableSports.isEmpty {
@@ -201,7 +206,7 @@ private struct GoalsSettings: View {
         } else if let sport {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(sport.rawValue)
+                    Text(sport.displayName)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(Theme.ink)
                     Text("\(String(viewModel.currentYear)) targets · 0 hides a goal")
@@ -507,6 +512,23 @@ struct PillTabs: View {
     }
 }
 
+/// A sport tab's content: the sport's icon, or the word "All"
+struct SportTabLabel: View {
+    let sport: SportCategory
+    let selected: Bool
+
+    var body: some View {
+        if sport == .all {
+            Text("All")
+                .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                .padding(.horizontal, 4)
+        } else {
+            Image(systemName: sport.icon)
+                .font(.system(size: 13, weight: selected ? .medium : .regular))
+        }
+    }
+}
+
 /// Icon-only sport switcher, matching the popover header
 struct SportIconTabs: View {
     let sports: [SportCategory]
@@ -517,8 +539,7 @@ struct SportIconTabs: View {
             ForEach(sports) { sport in
                 let selected = selection == sport
                 Button(action: { selection = sport }) {
-                    Image(systemName: sport.icon)
-                        .font(.system(size: 13, weight: selected ? .medium : .regular))
+                    SportTabLabel(sport: sport, selected: selected)
                         .foregroundColor(selected ? Theme.ink : Theme.textTertiary)
                         .frame(width: 30, height: 26)
                         .background(selected ? Theme.cardRaised : Color.clear)
@@ -526,7 +547,7 @@ struct SportIconTabs: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .help(sport.rawValue)
+                .help(sport.displayName)
             }
         }
         .padding(2)

@@ -258,6 +258,12 @@ class StravaViewModel: ObservableObject {
     }
 
     func includes(_ activity: StravaActivity, in sport: SportCategory) -> Bool {
+        if sport == .all {
+            // Each activity goes through its own sport's filters, so a type
+            // or tag excluded there stays excluded here
+            let own = SportCategory.from(sportType: activity.sportType)
+            return !settings.hiddenSports.contains(own.rawValue) && includes(activity, in: own)
+        }
         guard sport.matches(sportType: activity.sportType),
               !settings.excludedSubTypes.contains(subTypeKey(activity.subType, sport: sport)) else { return false }
 
@@ -318,7 +324,8 @@ class StravaViewModel: ObservableObject {
 
     /// Whether the filter control is worth showing for this sport
     func hasFilters(_ sport: SportCategory) -> Bool {
-        subTypes(for: sport).count > 1 || !tags(for: sport).isEmpty
+        guard sport != .all else { return false } // filters live on each sport
+        return subTypes(for: sport).count > 1 || !tags(for: sport).isEmpty
     }
 
     /// Sub-types seen for a sport across all years, most common first
@@ -376,6 +383,7 @@ class StravaViewModel: ObservableObject {
     /// The sport used for menu bar display, falling back to first detected
     var menuBarSportCategory: SportCategory? {
         let name = settings.menuBarSport
+        if name == SportCategory.all.rawValue { return .all }
         if !name.isEmpty && detectedSports.contains(.sport(name)) {
             return .sport(name)
         }
@@ -651,13 +659,14 @@ class StravaViewModel: ObservableObject {
                 visible.append(sport)
             }
         }
-        availableSports = visible
+        // "All" only means something with more than one sport to combine
+        availableSports = visible.count > 1 ? [.all] + visible : visible
 
-        // If selectedSport is nil or was hidden, select the first available
+        // If selectedSport is nil or was hidden, select the first sport
         if let selected = selectedSport, availableSports.contains(selected) {
             // keep current selection
         } else {
-            selectedSport = availableSports.first
+            selectedSport = visible.first
         }
     }
 

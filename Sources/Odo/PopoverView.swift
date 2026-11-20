@@ -112,8 +112,7 @@ struct PopoverView: View {
             ForEach(viewModel.availableSports) { sport in
                 let selected = viewModel.selectedSport == sport
                 Button(action: { viewModel.selectedSport = sport }) {
-                    Image(systemName: sport.icon)
-                        .font(.system(size: 13, weight: selected ? .medium : .regular))
+                    SportTabLabel(sport: sport, selected: selected)
                         .foregroundColor(selected ? Theme.ink : Theme.textTertiary)
                         .frame(width: 30, height: 26)
                         .background(selected ? Theme.cardRaised : Color.clear)
@@ -122,7 +121,7 @@ struct PopoverView: View {
                         .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderless)
-                .help(sport.rawValue)
+                .help(sport.displayName)
             }
         }
         .padding(2)

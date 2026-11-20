@@ -1,15 +1,30 @@
 import SwiftUI
 
+/// One sport's week, for the breakdown on the All tab
+struct SportWeek: Identifiable {
+    let sport: SportCategory
+    let total: Double
+    let target: Double          // 0 when the sport has no goal
+    let unit: String
+    let useTimeFormat: Bool
+    var id: String { sport.id }
+    var done: Bool { target > 0 && total >= target }
+}
+
 /// "This week" card: progress against the weekly pace for the year's goal,
-/// with one dot per day showing which days you were active.
+/// with one dot per day showing which days you were active. On the All tab
+/// it also lists each sport against that sport's own weekly pace.
 struct WeekProgressView: View {
     let start: Date
     let days: [Double]          // 7 values, first weekday first
-    let weeklyTarget: Double    // yearly goal spread over the weeks
+    let weeklyTarget: Double    // yearly goal spread over the weeks; 0 for no goal
     let unit: String
     var useTimeFormat: Bool = false
     var streak: Int = 0
     var bestStreak: Int = 0
+    var breakdown: [SportWeek] = []
+
+    private var hasTarget: Bool { weeklyTarget > 0 }
 
     private var total: Double { days.reduce(0, +) }
     private var progress: Double { weeklyTarget > 0 ? min(total / weeklyTarget, 1) : 0 }
@@ -47,28 +62,23 @@ struct WeekProgressView: View {
 
                 Text(statusText)
                     .font(.system(size: 11))
-                    .foregroundColor(total >= weeklyTarget ? Theme.positive : Theme.textTertiary)
+                    .foregroundColor(hasTarget && total >= weeklyTarget ? Theme.positive : Theme.textTertiary)
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 5) {
                 Text(fmt(total))
                     .font(.system(size: 30, weight: .black).width(.condensed).italic())
                     .foregroundColor(Theme.ink)
-                Text("/ \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit)")
+                Text(hasTarget ? "/ \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit)" : (useTimeFormat ? "" : unit))
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
             }
             .padding(.top, -4)
 
-            // Thin progress bar
-            GeometryReader { geo in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Theme.ink.opacity(0.07))
-                    Capsule().fill(Theme.accent).frame(width: geo.size.width * progress)
-                }
+            if hasTarget {
+                ProgressBar(progress: progress)
             }
-            .frame(height: 4)
 
             // One dot per day
             HStack(spacing: 0) {
@@ -84,7 +94,16 @@ struct WeekProgressView: View {
                 }
             }
 
-            streakRow
+            if !breakdown.isEmpty {
+                VStack(spacing: 9) {
+                    ForEach(breakdown) { sportRow($0) }
+                }
+                .padding(.top, 2)
+            }
+
+            if hasTarget {
+                streakRow
+            }
         }
         .padding(16)
         .background(Theme.card)
@@ -130,7 +149,48 @@ struct WeekProgressView: View {
         .frame(width: 14, height: 14)
     }
 
+    /// A sport's week: icon, name, total against its own weekly pace
+    private func sportRow(_ s: SportWeek) -> some View {
+        func fmt(_ v: Double) -> String {
+            s.useTimeFormat ? formatTime(v) : formatNumber(v, decimals: v >= 100 ? 0 : 1)
+        }
+        let unit = s.useTimeFormat ? "" : " \(s.unit)"
+        return VStack(spacing: 5) {
+            HStack(spacing: 7) {
+                Image(systemName: s.sport.icon)
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 16)
+                Text(s.sport.displayName)
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.ink)
+                Spacer()
+                if s.done {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 9, weight: .bold))
+                        .foregroundColor(Theme.positive)
+                }
+                Text(s.target > 0 ? "\(fmt(s.total)) / \(fmt(s.target))\(unit)" : "\(fmt(s.total))\(unit)")
+                    .font(.system(size: 11).monospacedDigit())
+                    .foregroundColor(s.total > 0 ? Theme.textSecondary : Theme.textTertiary)
+            }
+            if s.target > 0 {
+                ProgressBar(progress: min(s.total / s.target, 1), height: 3)
+                    .padding(.leading, 23)
+            }
+        }
+        .help(s.target > 0 ? "This week against \(s.sport.displayName)'s weekly pace" : "No \(s.sport.displayName) goal set")
+    }
+
     private var statusText: String {
+        guard hasTarget else {
+            let active = days.filter { $0 > 0 }.count
+            if !breakdown.isEmpty, breakdown.contains(where: { $0.target > 0 }) {
+                let withGoal = breakdown.filter { $0.target > 0 }
+                return "\(withGoal.filter(\.done).count) of \(withGoal.count) on pace"
+            }
+            return active == 1 ? "1 active day" : "\(active) active days"
+        }
         if total >= weeklyTarget { return "Week done ✓" }
         let remaining = weeklyTarget - total
         let left = useTimeFormat ? fmt(remaining) : "\(fmt(remaining)) \(unit)"
@@ -139,5 +199,21 @@ struct WeekProgressView: View {
         case 1: return "\(left) to go · 1 day left"
         default: return "\(left) to go · \(daysLeft) days left"
         }
+    }
+}
+
+/// Thin capsule progress bar
+private struct ProgressBar: View {
+    let progress: Double
+    var height: CGFloat = 4
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.ink.opacity(0.07))
+                Capsule().fill(Theme.accent).frame(width: geo.size.width * progress)
+            }
+        }
+        .frame(height: height)
     }
 }

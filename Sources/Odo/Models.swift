@@ -101,14 +101,22 @@ struct StravaActivity: Codable {
 // MARK: - Sport Categories
 
 enum SportCategory: Identifiable, Hashable {
+    /// Every sport that isn't hidden, each with its own filters applied
+    case all
     case sport(String) // Dynamic, derived from activity data
 
     var id: String { rawValue }
 
+    /// Key for goals and settings
     var rawValue: String {
         switch self {
+        case .all: return "All"
         case .sport(let name): return name
         }
+    }
+
+    var displayName: String {
+        self == .all ? "All sports" : rawValue
     }
 
     // Maps Strava sport_type strings to a display name
@@ -209,6 +217,7 @@ enum SportCategory: Identifiable, Hashable {
 
     /// SF Symbol for the sport, falling back to a generic figure if unavailable
     var icon: String {
+        if self == .all { return "square.grid.2x2" }
         let name = Self.iconMap[rawValue] ?? "figure.mixed.cardio"
         return NSImage(systemSymbolName: name, accessibilityDescription: nil) != nil ? name : "figure.mixed.cardio"
     }
@@ -221,6 +230,7 @@ enum SportCategory: Identifiable, Hashable {
     /// Whether a given activity's sport type belongs to this category
     func matches(sportType: String) -> Bool {
         switch self {
+        case .all: return true
         case .sport(let name): return Self.from(sportType: sportType) == .sport(name)
         }
     }
