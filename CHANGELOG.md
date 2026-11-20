@@ -14,4 +14,6 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 - Year comparison graph with a podium for your best years, hover to scrub, click to lock.
 - Smart goals that suggest targets from your recent years.
 - Filter by activity type and tags like Commute and Race.
+- Syncing shows which year it's fetching and how many activities so far. If Strava's API limit is reached, Odo says when and carries on by itself once it resets.
+- The window fits its content, and never runs off the bottom of a smaller screen.
 - Updates install automatically.

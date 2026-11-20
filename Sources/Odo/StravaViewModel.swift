@@ -6,6 +6,8 @@ private struct ActivityCache: Codable {
     let activities: [Int: [StravaActivity]]
     let lastUpdated: Date
     var version: Int? = nil
+    /// Past years Strava returned nothing for, so syncs don't keep asking
+    var emptyYears: Set<Int>? = nil
 }
 
 /// Bump when StravaActivity gains fields, so cached years get re-fetched
@@ -17,10 +19,13 @@ class StravaViewModel: ObservableObject {
     private let api = StravaAPI()
     private let auth = StravaAuth()
     private var refreshTimer: Timer?
+    private var resumeTask: Task<Void, Never>?
 
     @Published var activities: [Int: [StravaActivity]] = [:]
     @Published var isLoading = false
     @Published var syncStatus: SyncStatus = .idle
+    /// Strava API usage from the last response
+    @Published var rateLimit: RateLimit?
     @Published var error: String?
     @Published var selectedSport: SportCategory?
     @Published var lastUpdated: Date?
@@ -29,6 +34,10 @@ class StravaViewModel: ObservableObject {
 
     /// Cached years fetched with an older cache version; re-fetched on next sync
     private var staleYears: Set<Int> = []
+
+    /// Past years already checked and found empty. Kept apart from
+    /// `activities`, where a missing year means "no data", not zero stats.
+    private var emptyYears: Set<Int> = []
 
     private static var cacheURL: URL {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
@@ -422,6 +431,7 @@ class StravaViewModel: ObservableObject {
             return
         }
         activities = cache.activities
+        emptyYears = cache.emptyYears ?? []
         lastUpdated = cache.lastUpdated
         if (cache.version ?? 1) < kCacheVersion {
             staleYears = Set(cache.activities.keys)
@@ -433,7 +443,8 @@ class StravaViewModel: ObservableObject {
         let cache = ActivityCache(
             activities: activities,
             lastUpdated: lastUpdated ?? Date(),
-            version: staleYears.isEmpty ? kCacheVersion : 1
+            version: staleYears.isEmpty ? kCacheVersion : 1,
+            emptyYears: emptyYears
         )
         if let data = try? JSONEncoder().encode(cache) {
             try? data.write(to: Self.cacheURL, options: .atomic)
@@ -479,85 +490,64 @@ class StravaViewModel: ObservableObject {
     }
 
     func fetchAllData() async {
+        guard !isLoading, rateLimitedUntil == nil else { return }
         isLoading = true
-        syncStatus = .syncing(year: currentYear, total: 1, completed: 0)
         error = nil
+        var fetched = 0
+        syncStatus = .syncing(year: currentYear, fetched: 0)
+
+        /// Fetches one year, updating the status after every page
+        func fetch(_ year: Int, token: String) async throws -> [StravaActivity] {
+            syncStatus = .syncing(year: year, fetched: fetched)
+            let base = fetched
+            defer { rateLimit = api.lastRateLimit }
+            let result = try await api.fetchActivities(year: year, accessToken: token) { [weak self] count in
+                self?.syncStatus = .syncing(year: year, fetched: base + count)
+            }
+            fetched = base + result.count
+            return result
+        }
 
         do {
             let token = try await ensureValidToken()
 
-            // Figure out how many years we need to fetch (uncached past years)
-            var yearsToFetch: [Int] = [currentYear]
-            var tempEmpty = 0
-            for year in stride(from: currentYear - 1, through: 2000, by: -1) {
-                if activities[year] != nil && !staleYears.contains(year) {
-                    tempEmpty = 0
-                    continue
-                }
-                yearsToFetch.append(year)
-                // We can't know if they're empty yet, so estimate conservatively
-                tempEmpty += 1
-                if tempEmpty >= 3 { break }
-            }
-            let totalYears = yearsToFetch.count
-            var completed = 0
-
             // Always re-fetch the current year (it's still changing)
-            syncStatus = .syncing(year: currentYear, total: totalYears, completed: completed)
             do {
-                let yearActivities = try await api.fetchActivities(year: currentYear, accessToken: token)
-                activities[currentYear] = yearActivities
+                activities[currentYear] = try await fetch(currentYear, token: token)
                 staleYears.remove(currentYear)
-                completed += 1
-            } catch let err as StravaError {
-                if case .rateLimited(let retry) = err {
-                    syncStatus = .rateLimited(retryAfter: retry)
-                    self.error = err.localizedDescription
-                    isLoading = false
-                    return
-                }
-                self.error = "Current year: \(err.localizedDescription)"
-                completed += 1
+            } catch StravaError.rateLimited(let resetsAt) {
+                throw StravaError.rateLimited(resetsAt: resetsAt)
             } catch {
                 self.error = "Current year: \(error.localizedDescription)"
-                completed += 1
             }
 
             // For past years, only fetch if not already cached.
-            // Walk backwards until we hit 3 consecutive empty years.
+            // Walk backwards until we hit 3 consecutive empty years,
+            // counting ones already known to be empty.
             var consecutiveEmpty = 0
             for year in stride(from: currentYear - 1, through: 2000, by: -1) {
+                if emptyYears.contains(year) {
+                    consecutiveEmpty += 1
+                    if consecutiveEmpty >= 3 { break }
+                    continue
+                }
                 if activities[year] != nil && !staleYears.contains(year) {
-                    // Already cached — skip
                     consecutiveEmpty = 0
                     continue
                 }
 
-                syncStatus = .syncing(year: year, total: totalYears, completed: completed)
-
                 do {
-                    let yearActivities = try await api.fetchActivities(year: year, accessToken: token)
+                    let yearActivities = try await fetch(year, token: token)
                     staleYears.remove(year)
-                    completed += 1
                     if yearActivities.isEmpty {
+                        emptyYears.insert(year)
                         consecutiveEmpty += 1
                     } else {
                         activities[year] = yearActivities
                         consecutiveEmpty = 0
                     }
-                } catch let err as StravaError {
-                    if case .rateLimited(let retry) = err {
-                        syncStatus = .rateLimited(retryAfter: retry)
-                        self.error = err.localizedDescription
-                        // Save what we have so far
-                        updateAvailableSports()
-                        lastUpdated = Date()
-                        saveCache()
-                        isLoading = false
-                        return
-                    }
-                    self.error = "\(year): \(err.localizedDescription)"
-                    break
+                } catch StravaError.rateLimited(let resetsAt) {
+                    throw StravaError.rateLimited(resetsAt: resetsAt)
                 } catch {
                     self.error = "\(year): \(error.localizedDescription)"
                     break
@@ -570,6 +560,10 @@ class StravaViewModel: ObservableObject {
             prefillGoalsFromLastYear()
             lastUpdated = Date()
             saveCache()
+        } catch StravaError.rateLimited(let resetsAt) {
+            hitRateLimit(until: resetsAt)
+            isLoading = false
+            return
         } catch {
             self.error = error.localizedDescription
         }
@@ -586,18 +580,54 @@ class StravaViewModel: ObservableObject {
         }
     }
 
+    // MARK: - Rate Limiting
+
+    /// Set while Strava is refusing requests; syncing is paused until then
+    var rateLimitedUntil: Date? {
+        if case .rateLimited(let until) = syncStatus, until > Date() { return until }
+        return nil
+    }
+
+    /// Keeps whatever finished before the 429, then picks the sync up again
+    /// once the window resets. Years already cached are skipped, so it
+    /// carries on from where it stopped.
+    private func hitRateLimit(until resetsAt: Date) {
+        if !activities.isEmpty {
+            updateAvailableSports()
+            saveCache()
+        }
+        syncStatus = .rateLimited(until: resetsAt)
+        error = nil
+
+        resumeTask?.cancel()
+        resumeTask = Task { [weak self] in
+            // A few seconds' grace past the reset, so the clocks agree
+            let delay = max(resetsAt.timeIntervalSinceNow, 0) + 5
+            try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+            guard !Task.isCancelled, let self, self.isAuthenticated else { return }
+            self.syncStatus = .idle
+            await self.fetchAllData()
+        }
+    }
+
     /// Force re-fetch a specific year (clears cache for it first)
     func refetchYear(_ year: Int) async {
+        guard rateLimitedUntil == nil else { return }
         do {
             let token = try await ensureValidToken()
+            defer { rateLimit = api.lastRateLimit }
             let yearActivities = try await api.fetchActivities(year: year, accessToken: token)
             if yearActivities.isEmpty {
                 activities.removeValue(forKey: year)
+                if year != currentYear { emptyYears.insert(year) }
             } else {
                 activities[year] = yearActivities
+                emptyYears.remove(year)
             }
             updateAvailableSports()
             saveCache()
+        } catch StravaError.rateLimited(let resetsAt) {
+            hitRateLimit(until: resetsAt)
         } catch {
             self.error = error.localizedDescription
         }
@@ -681,11 +711,16 @@ class StravaViewModel: ObservableObject {
     func disconnect() {
         settings.clearTokens()
         activities = [:]
+        emptyYears = []
         availableSports = []
         selectedSport = nil
         lastUpdated = nil
         error = nil
         try? FileManager.default.removeItem(at: Self.cacheURL)
+        resumeTask?.cancel()
+        resumeTask = nil
+        syncStatus = .idle
+        rateLimit = nil
         refreshTimer?.invalidate()
         refreshTimer = nil
     }

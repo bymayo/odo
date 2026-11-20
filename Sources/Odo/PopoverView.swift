@@ -1,30 +1,82 @@
 import SwiftUI
 
+/// The tallest the popover may be on the screen it's opening on.
+/// AppDelegate updates it each time the popover opens.
+final class PopoverLayout: ObservableObject {
+    static let shared = PopoverLayout()
+    @Published var maxHeight: CGFloat = 720
+}
+
+/// Natural heights of the popover's parts, gathered so it can fit its content
+private struct HeightKey: PreferenceKey {
+    static var defaultValue: [String: CGFloat] = [:]
+    static func reduce(value: inout [String: CGFloat], nextValue: () -> [String: CGFloat]) {
+        value.merge(nextValue()) { $1 }
+    }
+}
+
+private extension View {
+    func measureHeight(_ key: String) -> some View {
+        background(GeometryReader { geo in
+            Color.clear.preference(key: HeightKey.self, value: [key: geo.size.height])
+        })
+    }
+}
+
 struct PopoverView: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings = AppSettings.shared
+    @ObservedObject private var layout = PopoverLayout.shared
+    @State private var heights: [String: CGFloat] = [:]
+
+    /// Screens with centred content and no natural height get a fixed one
+    private static let setupHeight: CGFloat = 560
+    private static let firstSyncHeight: CGFloat = 420
+
+    private var showsFirstSync: Bool {
+        viewModel.activities.isEmpty && (viewModel.isLoading || viewModel.rateLimitedUntil != nil)
+    }
+
+    /// Fits the stats, header and footer, up to what the screen allows;
+    /// beyond that the stats scroll
+    private var height: CGFloat {
+        let wanted: CGFloat
+        if !viewModel.isAuthenticated {
+            wanted = Self.setupHeight
+        } else if showsFirstSync {
+            wanted = Self.firstSyncHeight
+        } else if let content = heights["content"] {
+            wanted = (heights["header"] ?? 0) + content + (heights["footer"] ?? 0)
+        } else {
+            wanted = layout.maxHeight // until the first measurement lands
+        }
+        return min(wanted.rounded(.up), layout.maxHeight)
+    }
 
     var body: some View {
         VStack(spacing: 0) {
             headerView
+                .measureHeight("header")
 
             if !viewModel.isAuthenticated {
                 SetupView(viewModel: viewModel)
-            } else if viewModel.isLoading && viewModel.activities.isEmpty {
-                loadingView
+            } else if showsFirstSync {
+                firstSyncView
             } else {
-
                 ScrollView {
                     StatsContentView(viewModel: viewModel)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 10)
+                        .measureHeight("content")
                 }
 
                 footerView
+                    .measureHeight("footer")
             }
         }
-        .frame(width: 360, height: 720)
+        .frame(width: 360, height: height, alignment: .top)
         .background(Theme.background)
+        .onPreferenceChange(HeightKey.self) { heights.merge($0) { $1 } }
     }
 
     // MARK: - Header
@@ -78,18 +130,46 @@ struct PopoverView: View {
         .cornerRadius(9)
     }
 
-    // MARK: - Loading
+    // MARK: - First sync
 
-    private var loadingView: some View {
-        VStack(spacing: 12) {
+    /// Shown until the first year of activities arrives: what's being fetched,
+    /// or when Strava will let it carry on
+    private var firstSyncView: some View {
+        VStack(spacing: 10) {
             Spacer()
-            ProgressView()
-                .tint(Theme.textSecondary)
-            Text("Loading activities...")
-                .font(.caption)
-                .foregroundColor(Theme.ink.opacity(0.4))
+            if let until = viewModel.rateLimitedUntil {
+                Image(systemName: "hourglass")
+                    .font(.system(size: 22, weight: .light))
+                    .foregroundColor(Theme.gold)
+                Text("Strava needs a breather")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.ink)
+                Text("Odo hit Strava's API limit. It'll pick up where it stopped at \(until.shortTimeOrTomorrow).")
+                    .font(.system(size: 11))
+                    .foregroundColor(Theme.textSecondary)
+                    .multilineTextAlignment(.center)
+            } else {
+                ProgressView()
+                    .controlSize(.small)
+                Text("Syncing your Strava history")
+                    .font(.system(size: 13, weight: .semibold))
+                    .foregroundColor(Theme.ink)
+                if case .syncing(let year, let fetched) = viewModel.syncStatus {
+                    Text(fetched > 0
+                         ? "Fetching \(String(year)) · \(fetched.formatted()) activities so far"
+                         : "Fetching \(String(year))…")
+                        .font(.system(size: 11).monospacedDigit())
+                        .foregroundColor(Theme.textSecondary)
+                }
+                Text("The first sync works back through every year, so it can take a minute.")
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textTertiary)
+                    .multilineTextAlignment(.center)
+                    .padding(.top, 4)
+            }
             Spacer()
         }
+        .padding(.horizontal, 40)
     }
 
     // MARK: - Footer
@@ -104,8 +184,9 @@ struct PopoverView: View {
                 Image(systemName: "arrow.clockwise")
             }
             .buttonStyle(.borderless)
-            .disabled(viewModel.isLoading)
-            .help("Refresh data")
+            .disabled(viewModel.isLoading || viewModel.rateLimitedUntil != nil)
+            .help(viewModel.rateLimitedUntil.map { "Strava's API limit is reached until \($0.shortTimeOrTomorrow)" }
+                  ?? "Refresh data")
 
             Button(action: { SettingsWindowController.shared.open(viewModel: viewModel) }) {
                 Image(systemName: "gearshape")
@@ -127,26 +208,32 @@ struct PopoverView: View {
 
     @ViewBuilder
     private var syncStatusView: some View {
-        if viewModel.isLoading {
-            HStack(spacing: 5) {
+        switch viewModel.syncStatus {
+        case .syncing:
+            HStack(spacing: 6) {
                 ProgressView()
-                    .scaleEffect(0.4)
-                    .frame(width: 10, height: 10)
+                    .controlSize(.mini)
                 Text(viewModel.syncStatus.description)
+                    .monospacedDigit()
                     .lineLimit(1)
             }
             .font(.system(size: 10))
-        } else if case .rateLimited = viewModel.syncStatus {
-            Label(viewModel.syncStatus.description, systemImage: "exclamationmark.triangle.fill")
+        case .rateLimited:
+            Label(viewModel.syncStatus.description, systemImage: "hourglass")
                 .font(.system(size: 10))
                 .foregroundColor(Theme.gold)
                 .lineLimit(1)
-        } else if case .done = viewModel.syncStatus {
+                .help("Strava allows a set number of API requests every 15 minutes and every day. "
+                      + "Odo keeps what it has and carries on automatically."
+                      + (viewModel.rateLimit?.summary.map { "\n\nUsage: \($0)" } ?? ""))
+        case .done:
             Label("Synced", systemImage: "checkmark")
                 .font(.system(size: 10))
-        } else if let lastUpdated = viewModel.lastUpdated {
-            Text("Updated \(lastUpdated.timeAgoDisplay())")
-                .font(.system(size: 10))
+        case .idle:
+            if let lastUpdated = viewModel.lastUpdated {
+                Text("Updated \(lastUpdated.timeAgoDisplay())")
+                    .font(.system(size: 10))
+            }
         }
     }
 }

@@ -199,8 +199,11 @@ struct YearChart: View {
                     VStack(alignment: .leading, spacing: 12) {
                         titleBar
                         hero
-                        chart
-                            .frame(height: 170)
+                        VStack(spacing: 6) {
+                            chart
+                                .frame(height: 170)
+                            scrubBar
+                        }
                     }
                     .padding(16)
                     .background(
@@ -219,6 +222,27 @@ struct YearChart: View {
                 // Page background behind everything so rounded corners stay visible
                 .background(Theme.background)
             }
+        }
+    }
+
+    // MARK: - Scrub hint
+
+    /// Sits under the graph, so the hint and Today stay with what you're scrubbing
+    private var scrubBar: some View {
+        HStack {
+            Text(lockedDay != nil ? "Locked to \(dateLabel(for: selectedDay).replacingOccurrences(of: "1 Jan → ", with: ""))" : "Hover to scrub · click to lock")
+                .font(.system(size: 9))
+                .foregroundColor(Theme.textTertiary)
+            Spacer()
+            let lockedToToday = lockedDay == today
+            Button(action: { lockedDay = lockedToToday ? nil : today }) {
+                Text(lockedToToday ? "Unlock" : "Today")
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                    .underline(lockedToToday)
+            }
+            .buttonStyle(.borderless)
+            .help(lockedToToday ? "Unlock" : "Lock graph to today")
         }
     }
 
@@ -418,23 +442,6 @@ struct YearChart: View {
                     }
                 }
             }
-
-            HStack {
-                Text(lockedDay != nil ? "Locked to \(dateLabel(for: selectedDay).replacingOccurrences(of: "1 Jan → ", with: ""))" : "Hover to scrub · click to lock")
-                    .font(.system(size: 9))
-                    .foregroundColor(Theme.textTertiary)
-                Spacer()
-                let lockedToToday = lockedDay == today
-                Button(action: { lockedDay = lockedToToday ? nil : today }) {
-                    Text(lockedToToday ? "Unlock" : "Today")
-                        .font(.system(size: 10, weight: .medium))
-                        .foregroundColor(Theme.textSecondary)
-                        .underline(lockedToToday)
-                }
-                .buttonStyle(.borderless)
-                .help(lockedToToday ? "Unlock" : "Lock graph to today")
-            }
-            .padding(.top, 2)
         }
     }
 

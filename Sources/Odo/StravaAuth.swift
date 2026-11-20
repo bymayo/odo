@@ -125,6 +125,10 @@ class StravaAuth {
     private func checkHTTPResponse(_ response: URLResponse, data: Data) throws {
         guard let http = response as? HTTPURLResponse else { return }
         guard http.statusCode == 200 else {
+            if http.statusCode == 429 {
+                let resetsAt = RateLimit(headers: http)?.resetsAt ?? RateLimit.nextQuarterHour(after: Date())
+                throw StravaError.rateLimited(resetsAt: resetsAt)
+            }
             if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                let message = json["message"] as? String {
                 throw StravaError.apiError(message)
@@ -137,17 +141,14 @@ class StravaAuth {
 enum StravaError: LocalizedError {
     case notAuthenticated
     case apiError(String)
-    case rateLimited(retryAfter: Int?) // seconds until reset, if provided
+    case rateLimited(resetsAt: Date)
 
     var errorDescription: String? {
         switch self {
         case .notAuthenticated: return "Not authenticated with Strava"
         case .apiError(let msg): return msg
-        case .rateLimited(let retry):
-            if let mins = retry {
-                return "Rate limited — retry in \(max(mins / 60, 1)) min"
-            }
-            return "Rate limited by Strava"
+        case .rateLimited(let resetsAt):
+            return "Strava's rate limit is reached until \(resetsAt.shortTimeOrTomorrow)"
         }
     }
 }

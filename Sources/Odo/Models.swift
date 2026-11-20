@@ -287,36 +287,37 @@ func formatTime(_ hours: Double) -> String {
 
 enum SyncStatus: Equatable {
     case idle
-    case syncing(year: Int, total: Int, completed: Int)  // fetching year X, N of M
-    case rateLimited(retryAfter: Int?)
+    /// Fetching `year`; `fetched` counts activities downloaded so far this sync
+    case syncing(year: Int, fetched: Int)
+    case rateLimited(until: Date)
     case done
 
     var isActive: Bool {
-        switch self {
-        case .syncing: return true
-        default: return false
-        }
+        if case .syncing = self { return true }
+        return false
     }
 
     var description: String {
         switch self {
         case .idle: return ""
-        case .syncing(let year, let total, let completed):
-            if total > 1 {
-                return "Syncing \(year)... (\(completed)/\(total))"
-            }
-            return "Syncing \(year)..."
-        case .rateLimited(let retry):
-            if let secs = retry {
-                return "Rate limited — retry in \(max(secs / 60, 1)) min"
-            }
-            return "Rate limited by Strava"
-        case .done: return "Sync complete"
+        case .syncing(let year, let fetched):
+            return fetched > 0 ? "Syncing \(year) · \(fetched.formatted()) activities" : "Syncing \(year)…"
+        case .rateLimited(let until):
+            return "Strava limit hit · resumes \(until.shortTimeOrTomorrow)"
+        case .done: return "Synced"
         }
     }
 }
 
 // MARK: - Helpers
+
+extension Date {
+    /// "14:45" today, "tomorrow 00:00" after midnight
+    var shortTimeOrTomorrow: String {
+        let time = formatted(date: .omitted, time: .shortened)
+        return Calendar.current.isDateInToday(self) ? time : "tomorrow \(time)"
+    }
+}
 
 let kMetersToMiles = 0.000621371
 let kMetersToFeet = 3.28084

@@ -432,15 +432,28 @@ private struct AccountSettings: View {
     @ObservedObject var viewModel: StravaViewModel
     @State private var showDisconnectConfirm = false
 
+    private var syncDetail: String? {
+        if viewModel.syncStatus.isActive { return viewModel.syncStatus.description }
+        if case .rateLimited = viewModel.syncStatus { return viewModel.syncStatus.description }
+        return viewModel.lastUpdated.map { "Last synced \($0.timeAgoDisplay())" }
+    }
+
     var body: some View {
         SettingsSection("Strava") {
             SettingsRow(viewModel.isAuthenticated ? "Connected" : "Not connected",
-                        detail: viewModel.lastUpdated.map { "Last synced \($0.timeAgoDisplay())" },
+                        detail: syncDetail,
                         icon: viewModel.isAuthenticated ? "checkmark.circle.fill" : "xmark.circle") {
                 if viewModel.isAuthenticated {
                     Button("Sync now") { Task { await viewModel.fetchAllData() } }
-                        .disabled(viewModel.isLoading)
+                        .disabled(viewModel.isLoading || viewModel.rateLimitedUntil != nil)
                 }
+            }
+            if viewModel.isAuthenticated, let usage = viewModel.rateLimit?.summary {
+                SettingsRow("API usage", detail: usage, icon: "gauge.with.dots.needle.33percent") {
+                    EmptyView()
+                }
+                .help("Strava limits requests per app every 15 minutes and every day. "
+                      + "If Odo reaches either, it pauses and carries on when the limit resets.")
             }
         }
 

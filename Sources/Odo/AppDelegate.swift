@@ -55,11 +55,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         popover = NSPopover()
-        popover.contentSize = NSSize(width: 360, height: 720)
         popover.behavior = .transient
-        popover.contentViewController = NSHostingController(
-            rootView: PopoverView(viewModel: viewModel)
-        )
+        // The popover follows PopoverView's own height, which fits its content
+        let host = NSHostingController(rootView: PopoverView(viewModel: viewModel))
+        host.sizingOptions = .preferredContentSize
+        popover.contentViewController = host
 
         // If already authenticated, fetch fresh data (cache was loaded in init)
         if viewModel.isAuthenticated && viewModel.activities.isEmpty {
@@ -81,6 +81,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if popover.isShown {
             closePopover()
         } else if let button = statusItem.button {
+            // Leave room for the menu bar, the popover's arrow and a margin below
+            if let screen = button.window?.screen {
+                PopoverLayout.shared.maxHeight = max(screen.visibleFrame.height - 30, 320)
+            }
             popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
 
             // Activate the app and make the popover key so text fields get full keyboard support (paste, etc.)
