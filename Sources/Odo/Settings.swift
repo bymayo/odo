@@ -86,6 +86,14 @@ class AppSettings: ObservableObject {
         didSet { defaults.set(menuBarShowGoal, forKey: "menu_bar_show_goal") }
     }
 
+    // Heart rate for training load on the Fitness tab (0 max = use the highest seen)
+    @Published var maxHeartRate: Int {
+        didSet { defaults.set(maxHeartRate, forKey: "max_heart_rate") }
+    }
+    @Published var restingHeartRate: Int {
+        didSet { defaults.set(restingHeartRate, forKey: "resting_heart_rate") }
+    }
+
     // Unit system
     @Published var useMetricUnits: Bool {
         didSet {
@@ -134,6 +142,8 @@ class AppSettings: ObservableObject {
         smartBeatPercent = defaults.object(forKey: "smart_beat_percent") as? Int ?? 5
         smartStretchPercent = defaults.object(forKey: "smart_stretch_percent") as? Int ?? 12
         useMetricUnits = defaults.bool(forKey: "use_metric_units")
+        maxHeartRate = defaults.integer(forKey: "max_heart_rate")
+        restingHeartRate = defaults.object(forKey: "resting_heart_rate") as? Int ?? 60
 
         if refreshIntervalMinutes == 0 { refreshIntervalMinutes = 30 }
     }

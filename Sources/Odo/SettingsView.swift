@@ -115,6 +115,17 @@ private struct GeneralSettings: View {
             }
         }
 
+        SettingsSection("Heart rate", footer: "Used to work out training load on the Fitness tab. Leave max blank to use the highest Odo has seen on your activities.") {
+            SettingsRow("Max heart rate") {
+                HeartRateField(value: $settings.maxHeartRate,
+                               placeholder: viewModel.detectedMaxHeartRate.map(String.init) ?? "Auto")
+            }
+            SettingsDivider()
+            SettingsRow("Resting heart rate") {
+                HeartRateField(value: $settings.restingHeartRate, placeholder: "60")
+            }
+        }
+
         SettingsSection("App") {
             SettingsRow("Auto-refresh") {
                 Picker("", selection: $settings.refreshIntervalMinutes) {
@@ -628,6 +639,27 @@ private struct SettingsRow<Control: View>: View {
                 .controlSize(.small)
         }
         .padding(.vertical, 9)
+    }
+}
+
+/// A bpm field; empty means 0 (auto)
+private struct HeartRateField: View {
+    @Binding var value: Int
+    let placeholder: String
+
+    var body: some View {
+        HStack(spacing: 4) {
+            TextField(placeholder, text: Binding(
+                get: { value > 0 ? String(value) : "" },
+                set: { value = min(Int($0.filter(\.isNumber)) ?? 0, 250) }
+            ))
+            .textFieldStyle(.roundedBorder)
+            .multilineTextAlignment(.trailing)
+            .frame(width: 52)
+            Text("bpm")
+                .font(.system(size: 11))
+                .foregroundColor(Theme.textTertiary)
+        }
     }
 }
 

@@ -19,6 +19,7 @@ make clean            # remove build/ and .build/
 
 - `Sources/Odo/`: all app code. `AppDelegate` owns the status item and popover; `StravaViewModel` fetches, caches (`~/Library/Application Support/Odo`) and derives stats; `AppSettings` wraps UserDefaults.
 - `OdoMark` draws the running-track mark: the menu bar template image, the popover header and, via `Scripts/AppIcon` (`make icon`), `Packaging/AppIcon.icns` and a 1024px `AppIcon.png`. Change the shape there and rerun `make icon`; both are committed.
+- `Fitness` computes training load per activity (heart-rate TRIMP scaled so an hour at threshold is 100, then Strava's `suffer_score`, then a per-sport time estimate) and the fitness (42-day), fatigue (7-day) and form series; `FitnessView` draws the tab. Adding fields to `StravaActivity` means bumping `kCacheVersion` so cached years re-fetch.
 - `Packaging/`: `Info.plist` (version, bundle ID `uk.co.bymayo.odo`, `SUFeedURL`, `SUPublicEDKey`) and entitlements. `Scripts/build-dmg.sh` assembles `Odo.app` from the package build; there is no Xcode-generated plist.
 - `AppInfo.isBundled` separates Odo.app from `swift run`. Sparkle (`Updater`) and SMAppService (`LaunchAtLogin`) only work in the bundle; dev builds skip updates and use a LaunchAgent.
 - `LegacyMigration` copies settings from the old `StravaBar` and bare-executable `Odo` defaults domains into the bundle's, moves the cache and swaps old launch agents. It runs once, before anything reads settings.

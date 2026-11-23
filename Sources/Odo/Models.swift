@@ -71,6 +71,11 @@ struct StravaActivity: Codable {
     let commute: Bool?
     /// Strava workout_type: 1/11 race, 2 long run, 3/12 workout (run/ride)
     let workoutType: Int?
+    // For training load (Fitness tab). Strava leaves these out when there's no data
+    let averageHeartrate: Double?
+    let maxHeartrate: Double?
+    let sufferScore: Double?
+    let weightedAverageWatts: Double?
 
     /// Strava sport type, used for type filtering within a sport
     var subType: String { sportType }
@@ -95,6 +100,10 @@ struct StravaActivity: Codable {
         case sportType = "sport_type"
         case startDate = "start_date"
         case movingTime = "moving_time"
+        case averageHeartrate = "average_heartrate"
+        case maxHeartrate = "max_heartrate"
+        case sufferScore = "suffer_score"
+        case weightedAverageWatts = "weighted_average_watts"
     }
 }
 

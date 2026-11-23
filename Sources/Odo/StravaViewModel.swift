@@ -11,7 +11,7 @@ private struct ActivityCache: Codable {
 }
 
 /// Bump when StravaActivity gains fields, so cached years get re-fetched
-private let kCacheVersion = 3
+private let kCacheVersion = 4
 
 @MainActor
 class StravaViewModel: ObservableObject {
@@ -230,6 +230,53 @@ class StravaViewModel: ObservableObject {
             week = cal.date(byAdding: .weekOfYear, value: 1, to: week)!
         }
         return (current, max(best, current))
+    }
+
+    // MARK: - Fitness
+
+    /// Max heart rate seen in the last two years, ignoring the top 1% as strap glitches
+    var detectedMaxHeartRate: Int? {
+        var maxes: [Double] = []
+        for year in (currentYear - 1)...currentYear {
+            for a in activities[year] ?? [] {
+                if let hr = a.maxHeartrate, hr > 100, hr < 230 { maxes.append(hr) }
+            }
+        }
+        maxes.sort(by: >)
+        guard !maxes.isEmpty else { return nil }
+        return Int(maxes[maxes.count / 100].rounded())
+    }
+
+    /// The max heart rate load is worked out from: the user's, else the highest seen
+    var effectiveMaxHeartRate: Int? {
+        settings.maxHeartRate > 0 ? settings.maxHeartRate : detectedMaxHeartRate
+    }
+
+    /// Fitness, fatigue and form for a sport, from its first activity to today
+    func fitnessHistory(sport: SportCategory) -> FitnessHistory {
+        let cal = Calendar.current
+        let maxHR = effectiveMaxHeartRate.map(Double.init)
+        let resting = Double(settings.restingHeartRate > 0 ? settings.restingHeartRate : 60)
+        let yearAgo = cal.date(byAdding: .year, value: -1, to: Date()) ?? Date()
+
+        var history = FitnessHistory()
+        var daily: [Date: Double] = [:]
+        for (_, list) in activities {
+            for a in list where includes(a, in: sport) {
+                guard let date = parseDate(a.startDate) else { continue }
+                let load = Fitness.load(a, maxHR: maxHR, restingHR: resting)
+                daily[cal.startOfDay(for: date), default: 0] += load.value
+                if date >= yearAgo {
+                    switch load.source {
+                    case .heartRate: history.heartRate += 1
+                    case .relativeEffort: history.relativeEffort += 1
+                    case .estimate: history.estimate += 1
+                    }
+                }
+            }
+        }
+        history.days = Fitness.series(dailyLoad: daily, through: Date(), calendar: cal)
+        return history
     }
 
     /// Menu bar sport/metric: true when on or ahead of pace, false when behind, nil with no goal

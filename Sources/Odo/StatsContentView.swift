@@ -34,6 +34,8 @@ struct StatsContentView: View {
                 } else {
                     YearComparisonView(viewModel: viewModel)
                 }
+            } else if tab == "fitness" {
+                FitnessView(viewModel: viewModel)
             } else {
                 goalsContent(stats: stats, goal: goal)
             }
@@ -76,7 +78,8 @@ struct StatsContentView: View {
     private var tabBar: some View {
         HStack(spacing: 2) {
             tabButton("Goals", icon: "target", value: "goals")
-            tabButton("Year Comparison", icon: "chart.xyaxis.line", value: "compare")
+            tabButton("Years", icon: "chart.xyaxis.line", value: "compare")
+            tabButton("Fitness", icon: "waveform.path.ecg", value: "fitness")
         }
         .padding(3)
         .background(Theme.card)
