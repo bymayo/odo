@@ -3,7 +3,7 @@ import SwiftUI
 // MARK: - Model
 
 struct GoalSuggestion: Identifiable, Hashable {
-    enum Kind: String { case match, beat, stretch, bestEver, finishable }
+    enum Kind: String { case lastYear, match, beat, stretch, bestEver, finishable }
 
     let kind: Kind
     let value: Double
@@ -105,6 +105,12 @@ extension StravaViewModel {
             }
 
             var options: [GoalSuggestion] = []
+            // Last year's exact total, to set the goal to "do it again"
+            if last > 0 {
+                let value = last.rounded()
+                options.append(GoalSuggestion(kind: .lastYear, value: value, label: "Last year · \(String(lastYear))",
+                                              detail: perWeek(value, metric: metric)))
+            }
             let match = roundGoal(base, metric: metric)
             options.append(GoalSuggestion(kind: .match, value: match, label: "Match",
                                           detail: perWeek(match, metric: metric)))
@@ -152,60 +158,32 @@ extension StravaViewModel {
     }
 }
 
-// MARK: - Panel
+// MARK: - Picker
 
-/// Suggestion chips per metric; tap to choose, Apply to set the goals
-struct SmartGoalsPanel: View {
-    @ObservedObject var viewModel: StravaViewModel
+/// One goal's suggestions, in a popover from its card. Picking one sets only that goal.
+struct SmartGoalPicker: View {
+    let suggestions: MetricSuggestions
     @ObservedObject var settings: AppSettings
-    let sport: SportCategory
-    var onApply: () -> Void
-
-    @State private var choices: [String: GoalSuggestion] = [:]
+    let current: Double
+    var onPick: (Double) -> Void
 
     var body: some View {
-        let suggestions = viewModel.smartSuggestions(for: sport)
-
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Label("Smart goals", systemImage: "sparkles")
+        VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 2) {
+                Label("Smart \(suggestions.title.lowercased()) goal", systemImage: "sparkles")
                     .font(.system(size: 13, weight: .semibold))
                     .foregroundColor(Theme.ink)
-                Spacer()
-                Text("Pick one per goal")
+                Text(suggestions.basis.prefix(1).uppercased() + suggestions.basis.dropFirst())
                     .font(.system(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
 
-            if suggestions.isEmpty {
-                Text("Not enough history yet. Record some activities first.")
-                    .font(.system(size: 11))
-                    .foregroundColor(Theme.textTertiary)
-            }
-
-            ForEach(suggestions) { metric in
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(spacing: 5) {
-                        Image(systemName: metric.icon)
-                            .font(.system(size: 10, weight: .medium))
-                        Text(metric.title)
-                            .font(.system(size: 12))
-                        Spacer()
-                        Text(metric.basis)
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textTertiary)
-                    }
-                    .foregroundColor(Theme.textSecondary)
-
-                    FlowLayout(spacing: 6) {
-                        ForEach(metric.options) { option in
-                            optionChip(option, metric: metric)
-                        }
-                    }
+            FlowLayout(spacing: 6) {
+                ForEach(suggestions.options) { option in
+                    chip(option)
                 }
             }
 
-            // Percentages
             HStack(spacing: 14) {
                 Stepper(value: $settings.smartBeatPercent, in: 1...50) {
                     Text("Beat +\(settings.smartBeatPercent)%")
@@ -217,38 +195,20 @@ struct SmartGoalsPanel: View {
                         .font(.system(size: 11).monospacedDigit())
                         .foregroundColor(Theme.textSecondary)
                 }
-                Spacer()
-                Button(action: { apply(suggestions) }) {
-                    Text("Apply")
-                        .font(.system(size: 12, weight: .semibold))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 6)
-                        .foregroundColor(Theme.background)
-                        .background(Theme.ink)
-                        .cornerRadius(8)
-                }
-                .buttonStyle(.borderless)
-                .disabled(suggestions.isEmpty)
             }
             .controlSize(.small)
+
+            Text("Only sets this goal.")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.textTertiary)
         }
-        .padding(16)
-        .background(Theme.card)
-        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.hairline, lineWidth: 1))
-        .cornerRadius(14)
+        .padding(14)
+        .frame(width: 300, alignment: .leading)
     }
 
-    private func chosen(_ metric: MetricSuggestions) -> GoalSuggestion? {
-        // Keep a choice by kind so it survives percentage changes
-        if let c = choices[metric.metric], let match = metric.options.first(where: { $0.kind == c.kind }) {
-            return match
-        }
-        return metric.defaultOption
-    }
-
-    private func optionChip(_ option: GoalSuggestion, metric: MetricSuggestions) -> some View {
-        let selected = chosen(metric)?.kind == option.kind
-        return Button(action: { choices[metric.metric] = option }) {
+    private func chip(_ option: GoalSuggestion) -> some View {
+        let selected = option.value == current
+        return Button(action: { onPick(option.value) }) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(option.label)
                     .font(.system(size: 9, weight: .medium))
@@ -265,22 +225,9 @@ struct SmartGoalsPanel: View {
             .background(selected ? Theme.ink : Theme.cardRaised)
             .overlay(RoundedRectangle(cornerRadius: 9).stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
             .cornerRadius(9)
+            .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)
-    }
-
-    private func apply(_ suggestions: [MetricSuggestions]) {
-        var goal = settings.goalFor(sport)
-        for metric in suggestions {
-            guard let value = chosen(metric)?.value else { continue }
-            switch metric.metric {
-            case "elevation": goal.elevationFeet = value
-            case "time": goal.timeHours = value
-            default: goal.distanceMiles = value
-            }
-        }
-        viewModel.objectWillChange.send()
-        settings.setGoal(goal, for: sport)
-        onApply()
+        .help(selected ? "Your current goal" : "Set \(suggestions.title.lowercased()) to \(formatNumber(option.value, decimals: 0)) \(suggestions.unit)")
     }
 }

@@ -94,6 +94,26 @@ class AppSettings: ObservableObject {
         didSet { defaults.set(restingHeartRate, forKey: "resting_heart_rate") }
     }
 
+    // Notifications (for the menu bar's sport and metric)
+    @Published var notifyWeekly: Bool {
+        didSet { defaults.set(notifyWeekly, forKey: "notify_weekly") }
+    }
+    @Published var notifyMonthly: Bool {
+        didSet { defaults.set(notifyMonthly, forKey: "notify_monthly") }
+    }
+    @Published var notifyYearly: Bool {
+        didSet { defaults.set(notifyYearly, forKey: "notify_yearly") }
+    }
+    @Published var notifyPace: Bool {
+        didSet { defaults.set(notifyPace, forKey: "notify_pace") }
+    }
+
+    @Published var notifyKudos: Bool {
+        didSet { defaults.set(notifyKudos, forKey: "notify_kudos") }
+    }
+
+    var anyNotifications: Bool { notifyWeekly || notifyMonthly || notifyYearly || notifyPace || notifyKudos }
+
     // Unit system
     @Published var useMetricUnits: Bool {
         didSet {
@@ -142,6 +162,11 @@ class AppSettings: ObservableObject {
         smartBeatPercent = defaults.object(forKey: "smart_beat_percent") as? Int ?? 5
         smartStretchPercent = defaults.object(forKey: "smart_stretch_percent") as? Int ?? 12
         useMetricUnits = defaults.bool(forKey: "use_metric_units")
+        notifyWeekly = defaults.object(forKey: "notify_weekly") as? Bool ?? true
+        notifyMonthly = defaults.object(forKey: "notify_monthly") as? Bool ?? true
+        notifyYearly = defaults.object(forKey: "notify_yearly") as? Bool ?? true
+        notifyPace = defaults.object(forKey: "notify_pace") as? Bool ?? true
+        notifyKudos = defaults.object(forKey: "notify_kudos") as? Bool ?? true
         maxHeartRate = defaults.integer(forKey: "max_heart_rate")
         restingHeartRate = defaults.object(forKey: "resting_heart_rate") as? Int ?? 60
 

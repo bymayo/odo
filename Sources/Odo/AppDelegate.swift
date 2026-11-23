@@ -61,6 +61,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         host.sizingOptions = .preferredContentSize
         popover.contentViewController = host
 
+        // Clicking a notification opens the popover
+        Notifier.shared.onOpen = { [weak self] in self?.showPopover() }
+        Notifier.shared.start()
+
         // If already authenticated, fetch fresh data (cache was loaded in init)
         if viewModel.isAuthenticated && viewModel.activities.isEmpty {
             Task {
@@ -80,7 +84,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor @objc private func togglePopover() {
         if popover.isShown {
             closePopover()
-        } else if let button = statusItem.button {
+        } else {
+            showPopover()
+        }
+    }
+
+    @MainActor private func showPopover() {
+        guard !popover.isShown else { return }
+        if let button = statusItem.button {
             // Open on the sport the menu bar shows, whichever tab was left open
             viewModel.selectMenuBarSport()
             // Leave room for the menu bar, the popover's arrow and a margin below

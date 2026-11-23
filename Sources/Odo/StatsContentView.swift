@@ -4,6 +4,8 @@ struct StatsContentView: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings = AppSettings.shared
     @AppStorage("stats_tab") private var tab = "goals"
+    /// The goal card shown in full; the others collapse to one line
+    @AppStorage("expanded_goal") private var expandedGoal = "distance"
     @State private var showFilters = false
 
     var body: some View {
@@ -106,6 +108,30 @@ struct StatsContentView: View {
         .buttonStyle(.borderless)
     }
 
+    /// Last year's total by today's day of the year, if there's data for last year
+    private func lastYear(_ metric: String) -> Double? {
+        guard let sport = viewModel.selectedSport,
+              viewModel.activities[viewModel.currentYear - 1]?.isEmpty == false else { return nil }
+        let stats = viewModel.statsForYear(viewModel.currentYear - 1, sport: sport)
+        switch metric {
+        case "elevation": return stats.elevationToDate
+        case "time": return stats.timeToDate
+        default: return stats.distanceToDate
+        }
+    }
+
+    /// The expanded goal, falling back to the first one that's set
+    private func openGoal(_ goal: SportGoal) -> String {
+        let set = [("distance", goal.distanceMiles), ("elevation", goal.elevationFeet), ("time", goal.timeHours)]
+            .filter { $0.1 > 0 }.map(\.0)
+        return set.contains(expandedGoal) ? expandedGoal : set.first ?? "distance"
+    }
+
+    private func recent(_ metric: String) -> Double {
+        guard let sport = viewModel.selectedSport else { return 0 }
+        return viewModel.recentPerWeek(sport: sport, metric: metric)
+    }
+
     private func reached(_ metric: String, _ target: Double) -> Date? {
         guard let sport = viewModel.selectedSport else { return nil }
         return viewModel.goalReachedDate(sport: sport, metric: metric, goal: target)
@@ -193,7 +219,12 @@ struct StatsContentView: View {
                     current: stats.totalDistance,
                     goal: goal.distanceMiles,
                     unit: settings.distanceUnit,
-                    reachedOn: reached("distance", goal.distanceMiles)
+                    reachedOn: reached("distance", goal.distanceMiles),
+                    metric: "distance",
+                    recentPerWeek: recent("distance"),
+                    lastYearToDate: lastYear("distance"),
+                    expanded: openGoal(goal) == "distance",
+                    onExpand: { withAnimation(.easeOut(duration: 0.2)) { expandedGoal = "distance" } }
                 )
             }
 
@@ -205,7 +236,12 @@ struct StatsContentView: View {
                     current: stats.totalElevation,
                     goal: goal.elevationFeet,
                     unit: settings.elevationUnit,
-                    reachedOn: reached("elevation", goal.elevationFeet)
+                    reachedOn: reached("elevation", goal.elevationFeet),
+                    metric: "elevation",
+                    recentPerWeek: recent("elevation"),
+                    lastYearToDate: lastYear("elevation"),
+                    expanded: openGoal(goal) == "elevation",
+                    onExpand: { withAnimation(.easeOut(duration: 0.2)) { expandedGoal = "elevation" } }
                 )
             }
 
@@ -218,7 +254,12 @@ struct StatsContentView: View {
                     goal: goal.timeHours,
                     unit: "hrs",
                     useTimeFormat: true,
-                    reachedOn: reached("time", goal.timeHours)
+                    reachedOn: reached("time", goal.timeHours),
+                    metric: "time",
+                    recentPerWeek: recent("time"),
+                    lastYearToDate: lastYear("time"),
+                    expanded: openGoal(goal) == "time",
+                    onExpand: { withAnimation(.easeOut(duration: 0.2)) { expandedGoal = "time" } }
                 )
             }
 

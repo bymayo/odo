@@ -178,9 +178,7 @@ struct YearChart: View {
         let cal = Calendar.current
         guard let start = cal.date(from: DateComponents(year: currentYear, month: 1, day: 1)),
               let date = cal.date(byAdding: .day, value: max(day, 1) - 1, to: start) else { return "" }
-        let f = DateFormatter()
-        f.dateFormat = "d MMM"
-        let label = f.string(from: date)
+        let label = formatDate(date, "d MMM")
         let suffix = day == today ? " (today)" : day > today ? " (if you stop today)" : ""
         return "1 Jan → \(label)" + suffix
     }

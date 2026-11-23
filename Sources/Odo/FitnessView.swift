@@ -181,9 +181,7 @@ struct FitnessChart: View {
     private func dateLabel(_ date: Date) -> String {
         let cal = Calendar.current
         if cal.isDateInToday(date) { return "Today" }
-        let f = DateFormatter()
-        f.dateFormat = cal.component(.year, from: date) == cal.component(.year, from: Date()) ? "EEE d MMM" : "d MMM yyyy"
-        return f.string(from: date)
+        return formatDate(date, cal.component(.year, from: date) == cal.component(.year, from: Date()) ? "EEE d MMM" : "d MMM yyyy")
     }
 
     // MARK: - Charts
@@ -290,9 +288,7 @@ struct FitnessChart: View {
     }
 
     private func axisLabel(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = days.count <= 50 ? "d MMM" : days.count <= 400 ? "MMM" : days.count <= 800 ? "MMM yy" : "yyyy"
-        return f.string(from: date)
+        formatDate(date, days.count <= 50 ? "d MMM" : days.count <= 400 ? "MMM" : days.count <= 800 ? "MMM yy" : "yyyy")
     }
 
     private func scrubOverlay(_ proxy: ChartProxy) -> some View {

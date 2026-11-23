@@ -83,12 +83,6 @@ class StravaViewModel: ObservableObject {
         let filtered = yearActivities.filter { includes($0, in: sport) }
 
         let calendar = Calendar.current
-        let iso8601 = ISO8601DateFormatter()
-        iso8601.formatOptions = [.withInternetDateTime]
-
-        // Fallback for dates with fractional seconds
-        let iso8601Frac = ISO8601DateFormatter()
-        iso8601Frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         var stats = YearStats(year: year)
 
@@ -102,7 +96,7 @@ class StravaViewModel: ObservableObject {
             stats.totalTime += time
             stats.activityCount += 1
 
-            if let date = iso8601.date(from: activity.startDate) ?? iso8601Frac.date(from: activity.startDate) {
+            if let date = parseDate(activity.startDate) {
                 let dayOfYear = calendar.ordinality(of: .day, in: .year, for: date) ?? 366
                 if year == currentYear || dayOfYear <= currentDayOfYear {
                     stats.distanceToDate += distance
@@ -120,10 +114,6 @@ class StravaViewModel: ObservableObject {
     /// Past years run to Dec 31; the current year stops at today.
     func cumulativeDaily(_ year: Int, sport: SportCategory, metric: String) -> [Double] {
         let calendar = Calendar.current
-        let iso8601 = ISO8601DateFormatter()
-        iso8601.formatOptions = [.withInternetDateTime]
-        let iso8601Frac = ISO8601DateFormatter()
-        iso8601Frac.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
 
         let daysInYear = calendar.date(from: DateComponents(year: year, month: 1, day: 1))
             .flatMap { calendar.range(of: .day, in: .year, for: $0)?.count } ?? 365
@@ -131,7 +121,7 @@ class StravaViewModel: ObservableObject {
 
         var daily = [Double](repeating: 0, count: daysInYear + 1)
         for activity in activities[year] ?? [] where includes(activity, in: sport) {
-            guard let date = iso8601.date(from: activity.startDate) ?? iso8601Frac.date(from: activity.startDate),
+            guard let date = parseDate(activity.startDate),
                   let day = calendar.ordinality(of: .day, in: .year, for: date),
                   day <= daysInYear else { continue }
             switch metric {
@@ -150,13 +140,7 @@ class StravaViewModel: ObservableObject {
 
     // MARK: - Goal insights
 
-    private func parseDate(_ string: String) -> Date? {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withInternetDateTime]
-        if let d = f.date(from: string) { return d }
-        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return f.date(from: string)
-    }
+    private func parseDate(_ string: String) -> Date? { StravaDate.parse(string) }
 
     private func metricValue(_ a: StravaActivity, metric: String) -> Double {
         switch metric {
@@ -174,6 +158,63 @@ class StravaViewModel: ObservableObject {
         let cal = Calendar.current
         return cal.date(from: DateComponents(year: currentYear, month: 1, day: 1))
             .flatMap { cal.date(byAdding: .day, value: day - 1, to: $0) }
+    }
+
+    /// Total of a metric, and how many activities, from `start` up to (not including) `end`
+    func total(sport: SportCategory, metric: String, from start: Date, to end: Date) -> (value: Double, count: Int) {
+        let cal = Calendar.current
+        let years = cal.component(.year, from: start)...cal.component(.year, from: end.addingTimeInterval(-1))
+        var value = 0.0, count = 0
+        for year in years {
+            for a in activities[year] ?? [] where includes(a, in: sport) {
+                guard let date = parseDate(a.startDate), date >= start, date < end else { continue }
+                value += metricValue(a, metric: metric)
+                count += 1
+            }
+        }
+        return (value, count)
+    }
+
+    /// Weekly average over the last four weeks
+    func recentPerWeek(sport: SportCategory, metric: String) -> Double {
+        let now = Date()
+        let start = Calendar.current.date(byAdding: .day, value: -28, to: now) ?? now
+        return total(sport: sport, metric: metric, from: start, to: now).value / 4
+    }
+
+    /// The yearly goal for a metric (0 when none)
+    func goalTarget(sport: SportCategory, metric: String) -> Double {
+        let goal = settings.goalFor(sport)
+        switch metric {
+        case "elevation": return goal.elevationFeet
+        case "time": return goal.timeHours
+        default: return goal.distanceMiles
+        }
+    }
+
+    /// Catching up on a sport's goal for a metric; nil with no goal
+    func catchUp(sport: SportCategory, metric: String) -> CatchUp? {
+        let goal = goalTarget(sport: sport, metric: metric)
+        guard goal > 0 else { return nil }
+        return CatchUp(current: yearToDate(sport: sport, metric: metric), goal: goal,
+                       recentPerWeek: recentPerWeek(sport: sport, metric: metric), metric: metric)
+    }
+
+    /// The most recent activity this year, for test notifications
+    var latestActivity: StravaActivity? {
+        (activities[currentYear] ?? []).max { $0.startDate < $1.startDate }
+    }
+
+    /// The date an activity started
+    func startDate(of activity: StravaActivity) -> Date? { parseDate(activity.startDate) }
+
+    /// An activity's value for a metric, in the user's units
+    func value(of activity: StravaActivity, metric: String) -> Double { metricValue(activity, metric: metric) }
+
+    /// This year's total so far
+    func yearToDate(sport: SportCategory, metric: String) -> Double {
+        (activities[currentYear] ?? []).filter { includes($0, in: sport) }
+            .reduce(0.0) { $0 + metricValue($1, metric: metric) }
     }
 
     /// Totals for each day of the current week (locale's first weekday first)
@@ -556,6 +597,7 @@ class StravaViewModel: ObservableObject {
         isLoading = true
         error = nil
         var fetched = 0
+        var newActivities: [StravaActivity] = []
         syncStatus = .syncing(year: currentYear, fetched: 0)
 
         /// Fetches one year, updating the status after every page
@@ -574,8 +616,14 @@ class StravaViewModel: ObservableObject {
             let token = try await ensureValidToken()
 
             // Always re-fetch the current year (it's still changing)
+            let knownIDs = Set((activities[currentYear] ?? []).map(\.id))
+            let isFirstSync = lastUpdated == nil
             do {
-                activities[currentYear] = try await fetch(currentYear, token: token)
+                let fetchedYear = try await fetch(currentYear, token: token)
+                activities[currentYear] = fetchedYear
+                if !isFirstSync {
+                    newActivities = fetchedYear.filter { !knownIDs.contains($0.id) }
+                }
                 staleYears.remove(currentYear)
             } catch StravaError.rateLimited(let resetsAt) {
                 throw StravaError.rateLimited(resetsAt: resetsAt)
@@ -622,6 +670,8 @@ class StravaViewModel: ObservableObject {
             prefillGoalsFromLastYear()
             lastUpdated = Date()
             saveCache()
+            Notifier.shared.kudos(for: newActivities, vm: self)
+            Notifier.shared.check(self)
         } catch StravaError.rateLimited(let resetsAt) {
             hitRateLimit(until: resetsAt)
             isLoading = false

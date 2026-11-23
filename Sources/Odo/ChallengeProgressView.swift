@@ -9,6 +9,15 @@ struct ChallengeProgressView: View {
     var useTimeFormat: Bool = false
     /// Day the goal was reached this year (nil if not yet)
     var reachedOn: Date? = nil
+    /// "distance", "elevation" or "time", for rounding the doable target
+    var metric = "distance"
+    /// Weekly average over the last four weeks, for the doable target
+    var recentPerWeek: Double = 0
+    /// Last year's total by the same day of the year (nil with no data for last year)
+    var lastYearToDate: Double? = nil
+    /// Collapsed cards are one line and a thin bar
+    var expanded = true
+    var onExpand: (() -> Void)? = nil
 
     private var progress: Double {
         guard goal > 0 else { return 0 }
@@ -46,44 +55,59 @@ struct ChallengeProgressView: View {
         return String(format: "%.0f%%", current / goal * 100)
     }
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            // Label
-            HStack(spacing: 5) {
-                Image(systemName: icon)
-                    .font(.system(size: 10, weight: .medium))
-                Text(title)
-                    .font(.system(size: 12))
-            }
-            .foregroundColor(Theme.textSecondary)
+    private var goalText: String {
+        useTimeFormat ? "\(Int(goal))" : formatNumber(goal, decimals: goal >= 100 ? 0 : 1)
+    }
 
-            // Hero number
+    private var paceText: String { "\(aheadBehind >= 0 ? "+" : "−")\(fmt(abs(aheadBehind)))" }
+    private var paceColor: Color { aheadBehind >= 0 ? Theme.positive : Theme.negative }
+
+    var body: some View {
+        Group {
+            if expanded { full } else { compact }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .cornerRadius(14)
+    }
+
+    private var full: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            label
+
+            // Hero: progress against the goal, with the percentage on the right
             HStack(alignment: .lastTextBaseline, spacing: 5) {
                 Text(heroText)
-                    .font(.system(size: 46, weight: .black).width(.condensed).italic())
+                    .font(.system(size: 40, weight: .black).width(.condensed).italic())
                     .tracking(-1)
                     .foregroundColor(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
-                Text(heroUnit)
+                Text("/ \(goalText) \(heroUnit)")
                     .font(.system(size: 13, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+                Spacer(minLength: 8)
+                Text(percentText)
+                    .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                    .foregroundColor(Theme.ink)
             }
             .padding(.top, -6)
 
             paceBar
 
-            // Stats grid
             HStack(alignment: .top, spacing: 0) {
-                stat(percentText, "Complete")
+                stat(paceText, aheadBehind >= 0 ? "Ahead of pace" : "Behind pace",
+                     color: paceColor, marker: .tick(Self.paceTickColor))
                 Spacer(minLength: 8)
-                stat("\(aheadBehind >= 0 ? "+" : "−")\(fmt(abs(aheadBehind)))",
-                     aheadBehind >= 0 ? "Ahead of pace" : "Behind pace",
-                     color: aheadBehind >= 0 ? Theme.positive : Theme.negative)
-                Spacer(minLength: 8)
-                stat(fmt(projectedTotal), "Projected")
-                Spacer(minLength: 8)
-                stat(fmt(goal), "Goal")
+                stat(fmt(projectedTotal), "Projected", marker: .fill(Self.projectedColor))
+                if let lastYearToDate {
+                    Spacer(minLength: 8)
+                    let diff = current - lastYearToDate
+                    stat("\(diff >= 0 ? "+" : "−")\(whole(abs(diff)))", "vs \(lastYearLabel)",
+                         color: diff >= 0 ? Theme.positive : Theme.negative)
+                        .help("\(lastYearLabel) had \(amount(lastYearToDate)) by today's date")
+                }
             }
 
             forecastLine
@@ -94,9 +118,64 @@ struct ChallengeProgressView: View {
             }
         }
         .padding(16)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Theme.card)
-        .cornerRadius(14)
+    }
+
+    /// One line and a thin bar; click to open
+    private var compact: some View {
+        VStack(spacing: 8) {
+                HStack(spacing: 8) {
+                    label
+                    Spacer(minLength: 8)
+                    (Text(heroText).foregroundColor(Theme.ink).font(.system(size: 13, weight: .semibold).monospacedDigit())
+                     + Text(" / \(goalText) \(heroUnit)").foregroundColor(Theme.textTertiary).font(.system(size: 11)))
+                        .lineLimit(1)
+                    Text(paceText)
+                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .foregroundColor(paceColor)
+                        .lineLimit(1)
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 8, weight: .semibold))
+                        .foregroundColor(Theme.textTertiary)
+                }
+                miniBar
+            }
+        .padding(.horizontal, 16)
+        .padding(.vertical, 12)
+        .contentShape(Rectangle())
+        .onTapGesture { onExpand?() }
+        .help("Show \(title.lowercased()) in full")
+    }
+
+    private var label: some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon)
+                .font(.system(size: 10, weight: .medium))
+            Text(title)
+                .font(.system(size: 12))
+        }
+        .foregroundColor(Theme.textSecondary)
+    }
+
+    /// Whole units above 100, for differences
+    private func whole(_ value: Double) -> String {
+        useTimeFormat ? formatTime(value) : formatNumber(value, decimals: value >= 100 ? 0 : 1)
+    }
+
+    private var lastYearLabel: String { String(Calendar.current.component(.year, from: Date()) - 1) }
+
+    private var miniBar: some View {
+        GeometryReader { geo in
+            let w = geo.size.width
+            ZStack(alignment: .leading) {
+                Capsule().fill(Theme.ink.opacity(0.07))
+                Capsule().fill(Theme.accent).frame(width: max(4, w * progress))
+                Rectangle()
+                    .fill(Self.paceTickColor)
+                    .frame(width: 1.5, height: 8)
+                    .offset(x: w * expectedProgress - 0.75)
+            }
+        }
+        .frame(height: 4)
     }
 
     // MARK: - Finish date forecast
@@ -107,20 +186,9 @@ struct ChallengeProgressView: View {
         return cal.date(from: DateComponents(year: year, month: 12, day: 31)) ?? Date()
     }
 
-    /// Date you'd reach the goal at your current average daily rate
-    private var forecastDate: Date? {
-        guard current > 0, current < goal else { return nil }
-        let perDay = current / dayOfYear
-        let daysNeeded = (goal - current) / perDay
-        guard daysNeeded.isFinite, daysNeeded < 365 * 20 else { return nil }
-        return Calendar.current.date(byAdding: .day, value: Int(daysNeeded.rounded(.up)), to: Date())
-    }
-
     private func dateText(_ date: Date) -> String {
         let cal = Calendar.current
-        let f = DateFormatter()
-        f.dateFormat = cal.component(.year, from: date) == cal.component(.year, from: Date()) ? "d MMM" : "d MMM yyyy"
-        return f.string(from: date)
+        return formatDate(date, cal.component(.year, from: date) == cal.component(.year, from: Date()) ? "d MMM" : "d MMM yyyy")
     }
 
     /// "+12 days early" / "26 days late" relative to 31 Dec
@@ -136,9 +204,6 @@ struct ChallengeProgressView: View {
         if let reachedOn {
             let (label, _) = earlyLate(reachedOn)
             forecastRow(icon: "flag.checkered", lead: "Hit on \(dateText(reachedOn))", tail: label, good: true)
-        } else if let date = forecastDate {
-            let (label, good) = earlyLate(date)
-            forecastRow(icon: "flag.checkered", lead: "At this rate, \(dateText(date))", tail: label, good: good)
         }
     }
 
@@ -155,7 +220,6 @@ struct ChallengeProgressView: View {
                 .foregroundColor(good ? Theme.positive : Theme.negative)
             Spacer(minLength: 0)
         }
-        .help("Based on your average so far this year")
     }
 
     // MARK: - Weekly target
@@ -168,15 +232,9 @@ struct ChallengeProgressView: View {
         Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
     }
 
-    /// Weekly amount needed from now to finish exactly on the goal
-    private var neededPerWeek: Double {
-        let weeksLeft = max((daysInYear - dayOfYear) / 7, 1.0 / 7)
-        return max(goal - current, 0) / weeksLeft
-    }
-
-    /// What you've averaged per week so far this year
-    private var averagePerWeek: Double {
-        current / max(dayOfYear / 7, 1.0 / 7)
+    /// Catch-up rate, plus a doable target when that's out of reach
+    private var catchUp: CatchUp {
+        CatchUp(current: current, goal: goal, recentPerWeek: recentPerWeek, metric: metric)
     }
 
     private func weekly(_ value: Double) -> String {
@@ -187,41 +245,89 @@ struct ChallengeProgressView: View {
         useTimeFormat ? formatTime(value) : "\(formatNumber(value, decimals: value >= 100 ? 0 : 1)) \(unit)"
     }
 
-    /// Shown when behind: the weekly amount that gets you back on pace
+    /// Shown when behind: two small tiles side by side, the weekly amount that
+    /// gets you back on pace and, when that's too much, a doable target from current form
     private var weeklyCallout: some View {
-        HStack(spacing: 10) {
-            Image(systemName: "arrow.up.right")
-                .font(.system(size: 10, weight: .bold))
-                .foregroundColor(.white)
-                .frame(width: 20, height: 20)
-                .background(Circle().fill(Theme.negative))
+        let plan = catchUp
+        return HStack(spacing: 8) {
+            tile(icon: "arrow.up.right", tint: Theme.negative,
+                 label: Text("To get on pace"),
+                 value: weekly(plan.neededPerWeek), valueColor: Theme.negative,
+                 background: Theme.negative.opacity(0.09))
+                .help("\(weekly(plan.neededPerWeek)) from now to 31 Dec finishes on \(amount(goal)).")
 
-            Text("To get on pace")
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Theme.ink)
+            if let doable = plan.doable {
+                tile(icon: "scope", tint: Theme.gold,
+                     label: Text("Doable") + Text(" · \(amount(doable.total))").foregroundColor(Theme.textTertiary),
+                     value: weekly(doable.perWeek), valueColor: Theme.ink,
+                     background: Theme.cardRaised.opacity(0.6))
+                    .help("""
+                        Set automatically from how you're going: \(weekly(plan.currentPerWeek)) is the better of \
+                        this year's average and your last four weeks. Ten percent more than that, kept up to \
+                        31 Dec, gets you to \(amount(doable.total)).
+                        """)
+            }
+        }
+    }
 
-            Spacer(minLength: 8)
-
-            Text(weekly(neededPerWeek))
-                .font(.system(size: 13, weight: .bold).monospacedDigit())
-                .foregroundColor(Theme.negative)
+    private func tile(icon: String, tint: Color, label: Text, value: String, valueColor: Color,
+                      background: Color) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 7, weight: .heavy))
+                    .foregroundColor(.white)
+                    .frame(width: 13, height: 13)
+                    .background(Circle().fill(tint))
+                label
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.85)
+            }
+            Text(value)
+                .font(.system(size: 14, weight: .bold).monospacedDigit())
+                .foregroundColor(valueColor)
                 .lineLimit(1)
-                .fixedSize()
+                .minimumScaleFactor(0.8)
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 10)
-        .background(Theme.negative.opacity(0.09))
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(background)
         .cornerRadius(10)
-        .help("You're averaging \(weekly(averagePerWeek)). \(weekly(neededPerWeek)) from now to the end of the year finishes on \(amount(goal)).")
     }
 
-    /// Pacebar-style scale: green fill for progress, dark tick for where you should be today
+    private static let paceTickColor = Theme.ink.opacity(0.6)
+    private static let projectedColor = Theme.accent.opacity(0.3)
+
+    /// The doable target, when it's showing below
+    private var doableTotal: Double? {
+        guard aheadBehind < 0, current < goal else { return nil }
+        return catchUp.doable?.total
+    }
+
+    /// Pacebar-style scale: green fill for progress, a fainter green on to where
+    /// this rate finishes, a dark tick for where you should be today and a gold
+    /// tick for the doable target
     private var paceBar: some View {
         GeometryReader { geo in
             let w = geo.size.width
+            let projected = goal > 0 ? min(projectedTotal / goal, 1) : 0
             ZStack(alignment: .leading) {
                 RoundedRectangle(cornerRadius: 3)
                     .fill(Theme.ink.opacity(0.07))
+
+                // Where this year's rate finishes
+                if projected > progress {
+                    RoundedRectangle(cornerRadius: 3)
+                        .fill(Theme.accent.opacity(0.1))
+                        .frame(width: w * projected)
+                    Rectangle()
+                        .fill(Self.projectedColor)
+                        .frame(width: 1.5)
+                        .offset(x: max(0, w * projected - 1.5))
+                }
 
                 RoundedRectangle(cornerRadius: 3)
                     .fill(Theme.accent.opacity(0.18))
@@ -232,28 +338,58 @@ struct ChallengeProgressView: View {
                     .frame(width: 2.5)
                     .offset(x: max(0, w * progress - 1.25))
 
+                // Doable target
+                if let doableTotal, goal > 0 {
+                    RoundedRectangle(cornerRadius: 1)
+                        .fill(Theme.gold)
+                        .frame(width: 2, height: 16)
+                        .offset(x: w * min(doableTotal / goal, 1) - 1)
+                }
+
                 // Where you should be today — crosses the bar
                 RoundedRectangle(cornerRadius: 1)
-                    .fill(Theme.ink.opacity(0.6))
+                    .fill(Self.paceTickColor)
                     .frame(width: 2, height: 16)
                     .offset(x: w * expectedProgress - 1)
             }
         }
         .frame(height: 8)
         .padding(.vertical, 4)
+        .help(barHelp)
     }
 
-    private func stat(_ value: String, _ label: String, color: Color = Theme.ink) -> some View {
+    private var barHelp: String {
+        var lines = ["Green: \(fmt(current)) so far", "Dark tick: where pace puts you today (\(fmt(expectedValue)))"]
+        if projectedTotal > current {
+            lines.append("Faint green: \(fmt(projectedTotal)) by 31 Dec at this year's rate")
+        }
+        if let doableTotal { lines.append("Gold tick: doable target (\(fmt(doableTotal)))") }
+        return lines.joined(separator: "\n")
+    }
+
+    private enum Marker {
+        case fill(Color)
+        case tick(Color)
+    }
+
+    private func stat(_ value: String, _ label: String, color: Color = Theme.ink, marker: Marker? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
                 .font(.system(size: 13, weight: .semibold).monospacedDigit())
                 .foregroundColor(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
-            Text(label)
-                .font(.system(size: 10))
-                .foregroundColor(Theme.textTertiary)
-                .lineLimit(1)
+            HStack(spacing: 4) {
+                switch marker {
+                case .fill(let c): RoundedRectangle(cornerRadius: 1.5).fill(c).frame(width: 8, height: 5)
+                case .tick(let c): RoundedRectangle(cornerRadius: 0.5).fill(c).frame(width: 2, height: 8)
+                case nil: EmptyView()
+                }
+                Text(label)
+                    .font(.system(size: 10))
+                    .foregroundColor(Theme.textTertiary)
+                    .lineLimit(1)
+            }
         }
         .fixedSize()
     }

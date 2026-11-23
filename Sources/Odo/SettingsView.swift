@@ -115,6 +115,8 @@ private struct GeneralSettings: View {
             }
         }
 
+        NotificationsSection(viewModel: viewModel, settings: settings)
+
         SettingsSection("Heart rate", footer: "Used to work out training load on the Fitness tab. Leave max blank to use the highest Odo has seen on your activities.") {
             SettingsRow("Max heart rate") {
                 HeartRateField(value: $settings.maxHeartRate,
@@ -163,6 +165,66 @@ private struct GeneralSettings: View {
     }
 }
 
+// MARK: - Notifications
+
+private struct NotificationsSection: View {
+    @ObservedObject var viewModel: StravaViewModel
+    @ObservedObject var settings: AppSettings
+    @ObservedObject var notifier = Notifier.shared
+
+    private var footer: String {
+        guard notifier.isAvailable else { return "Notifications work in the installed Odo.app, not dev builds." }
+        if notifier.authorization == .denied { return "Notifications are off for Odo in System Settings." }
+        let sport = viewModel.menuBarSportCategory?.displayName ?? "your menu bar sport"
+        return "Kudos come for any sport. Summaries and pace reminders are for \(sport) \(settings.menuBarMetric), as set for the menu bar: at the start of each week, month and year, and midweek when you're behind."
+    }
+
+    var body: some View {
+        SettingsSection("Notifications", footer: footer) {
+            toggle("Kudos", detail: "A well done when a new activity syncs", $settings.notifyKudos)
+            SettingsDivider()
+            toggle("Weekly summary", detail: "Last week against the week before", $settings.notifyWeekly)
+            SettingsDivider()
+            toggle("Monthly summary", detail: "Last month against the month before", $settings.notifyMonthly)
+            SettingsDivider()
+            toggle("Year in review", detail: "Last year against the year before", $settings.notifyYearly)
+            SettingsDivider()
+            toggle("Pace reminders", detail: "What it takes to catch up, and a doable target", $settings.notifyPace)
+            SettingsDivider()
+            SettingsRow(notifier.authorization == .denied ? "Turned off in System Settings" : "Try it") {
+                if notifier.authorization == .denied {
+                    Button("Open") {
+                        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Notifications-Settings.extension")!)
+                    }
+                } else {
+                    Button("Send a test") {
+                        notifier.requestAuthorization()
+                        if let latest = viewModel.latestActivity {
+                            notifier.kudos(for: [latest], vm: viewModel, force: true)
+                        }
+                        notifier.check(viewModel, force: true)
+                    }
+                    .disabled(!notifier.isAvailable)
+                }
+            }
+        }
+        .onAppear { notifier.refreshAuthorization() }
+    }
+
+    private func toggle(_ title: String, detail: String, _ isOn: Binding<Bool>) -> some View {
+        SettingsRow(title, detail: detail) {
+            Toggle("", isOn: Binding(
+                get: { isOn.wrappedValue },
+                set: { on in
+                    isOn.wrappedValue = on
+                    if on { notifier.requestAuthorization() }
+                }
+            ))
+            .settingsSwitch()
+        }
+    }
+}
+
 // MARK: - Updates
 
 private struct UpdatesSection: View {
@@ -204,8 +266,6 @@ private struct GoalsSettings: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings: AppSettings
     @State private var selected: SportCategory?
-    @State private var showSmart = false
-    @State private var goalVersion = 0
 
     private var sport: SportCategory? {
         selected ?? viewModel.availableSports.first { $0 != .all } ?? viewModel.availableSports.first
@@ -220,7 +280,7 @@ private struct GoalsSettings: View {
                     Text(sport.displayName)
                         .font(.system(size: 20, weight: .bold))
                         .foregroundColor(Theme.ink)
-                    Text("\(String(viewModel.currentYear)) targets · 0 hides a goal")
+                    Text("\(String(viewModel.currentYear)) targets · 0 hides a goal · ✦ suggests one")
                         .font(.system(size: 11))
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -231,35 +291,8 @@ private struct GoalsSettings: View {
                 ))
             }
 
-            Button(action: { withAnimation(.easeOut(duration: 0.15)) { showSmart.toggle() } }) {
-                HStack(spacing: 6) {
-                    Image(systemName: "sparkles")
-                    Text(showSmart ? "Hide suggestions" : "Suggest smart goals")
-                    Spacer()
-                    Image(systemName: showSmart ? "chevron.up" : "chevron.down")
-                        .font(.system(size: 9, weight: .semibold))
-                }
-                .font(.system(size: 12, weight: .medium))
-                .foregroundColor(Theme.ink)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background(Theme.card)
-                .cornerRadius(10)
-                .contentShape(Rectangle())
-            }
-            .buttonStyle(.borderless)
-
-            if showSmart {
-                SmartGoalsPanel(viewModel: viewModel, settings: settings, sport: sport) {
-                    goalVersion += 1
-                    withAnimation(.easeOut(duration: 0.15)) { showSmart = false }
-                }
-                .id(sport)
-                .transition(.opacity)
-            }
-
             GoalEditor(sport: sport, settings: settings, viewModel: viewModel)
-                .id("\(sport.rawValue)-\(goalVersion)") // reset fields on sport switch or after applying
+                .id(sport.rawValue) // reset fields on sport switch
         }
     }
 }
@@ -286,14 +319,18 @@ private struct GoalEditor: View {
     var body: some View {
         let last = viewModel.lastYearStats(for: sport)
         let lastYear = String(viewModel.currentYear - 1)
+        let smart = viewModel.smartSuggestions(for: sport)
 
         VStack(spacing: 10) {
             BigNumberField(label: "Distance", icon: "ruler", value: $distance, unit: settings.distanceUnit,
-                           hint: last.map { "\(lastYear): \(formatNumber($0.totalDistance, decimals: 0)) \(settings.distanceUnit)" })
+                           hint: last.map { "\(lastYear): \(formatNumber($0.totalDistance, decimals: 0)) \(settings.distanceUnit)" },
+                           suggestions: smart.first { $0.metric == "distance" }, settings: settings)
             BigNumberField(label: "Elevation", icon: "arrow.up.right", value: $elevation, unit: settings.elevationUnit,
-                           hint: last.map { "\(lastYear): \(formatNumber($0.totalElevation, decimals: 0)) \(settings.elevationUnit)" })
+                           hint: last.map { "\(lastYear): \(formatNumber($0.totalElevation, decimals: 0)) \(settings.elevationUnit)" },
+                           suggestions: smart.first { $0.metric == "elevation" }, settings: settings)
             BigNumberField(label: "Time", icon: "clock", value: $time, unit: "hrs",
-                           hint: last.map { "\(lastYear): \(formatTime($0.totalTime))" })
+                           hint: last.map { "\(lastYear): \(formatTime($0.totalTime))" },
+                           suggestions: smart.first { $0.metric == "time" }, settings: settings)
         }
         .onChange(of: distance) { _ in save() }
         .onChange(of: elevation) { _ in save() }
@@ -312,6 +349,11 @@ private struct BigNumberField: View {
     @Binding var value: Double
     let unit: String
     let hint: String?
+    /// Smart goal options for just this goal
+    var suggestions: MetricSuggestions? = nil
+    @ObservedObject var settings: AppSettings
+
+    @State private var showSmart = false
 
     private static let numberFont = Font.system(size: 38, weight: .black).width(.condensed).italic()
 
@@ -342,6 +384,25 @@ private struct BigNumberField: View {
                     Text(hint)
                         .font(.system(size: 10))
                         .foregroundColor(Theme.textTertiary)
+                }
+                if let suggestions {
+                    Button(action: { showSmart.toggle() }) {
+                        Image(systemName: "sparkles")
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(showSmart ? Theme.ink : Theme.textSecondary)
+                            .frame(width: 22, height: 22)
+                            .background(showSmart ? Theme.cardRaised : Color.clear)
+                            .cornerRadius(6)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Suggest a \(label.lowercased()) goal")
+                    .popover(isPresented: $showSmart, arrowEdge: .bottom) {
+                        SmartGoalPicker(suggestions: suggestions, settings: settings, current: value) { picked in
+                            value = picked
+                            showSmart = false
+                        }
+                    }
                 }
             }
             .foregroundColor(Theme.textSecondary)

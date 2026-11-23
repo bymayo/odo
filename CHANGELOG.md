@@ -9,10 +9,10 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 ## 1.0.0
 
 - First release of **Odo**: your yearly goals in the menu bar, from your Strava activities.
-- Goal cards with pace, a finish-date forecast and what it takes each week to get back on pace.
+- Goal cards with pace, how you compare with this time last year, and what it takes each week to get back on pace. One goal shows in full and the rest fold to a single line; click one to open it.
 - This week card with a streak of weeks hitting your weekly pace.
 - Year comparison graph with a podium for your best years, hover to scrub, click to lock.
-- Smart goals that suggest targets from your recent years.
+- Smart goals that suggest targets from your recent years. Each goal has its own ✨ button, so picking one only changes that goal.
 - Filter by activity type and tags like Commute and Race.
 - An **All** tab that adds up every sport, with its own goals and a this-week card showing each sport against its own weekly pace. Each sport's filters still apply, and it can be shown in the menu bar.
 - Syncing shows which year it's fetching and how many activities so far. If Strava's API limit is reached, Odo says when and carries on by itself once it resets.
@@ -21,4 +21,9 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 - Opening Odo from the menu bar shows the sport the menu bar is set to.
 - When you're behind, each goal shows what you need each week to get on pace in one clear line; hover it for the detail.
 - A **Fitness** tab for every sport and All: fitness, fatigue and form from the last six weeks back to your first activity, so you can see where training built you up and where it dropped off. Load comes from heart rate where your activities have it (set your max and resting heart rate in Settings), otherwise from Strava's Relative Effort or time. Odo re-syncs your history once to pick up heart rate.
+- Kudos: a well done notification when a new activity syncs, with its distance, time and climbing, how far it takes your goal, and a bigger cheer for the one that reaches it.
+- Notifications: a summary at the start of each week, month and year comparing it with the one before, a midweek reminder when you've fallen behind pace, and a note when you're back on it. They follow the menu bar's sport and metric, and each can be turned off in Settings.
+- When the catch-up needed is more than you've been doing, goals also show a doable target, worked out from how you're going this year.
+- Each goal's bar now shows where you'll finish at this rate (a fainter green) and the doable target (a gold tick), with a key under the numbers.
+- Switching tabs and sports is quick, even with thousands of activities.
 - Updates install automatically.

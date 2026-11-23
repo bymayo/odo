@@ -42,9 +42,8 @@ struct WeekProgressView: View {
 
     private var dayLetters: [String] {
         let cal = Calendar.current
-        let f = DateFormatter()
-        f.dateFormat = "EEEEE" // single-letter weekday
-        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start).map(f.string) }
+        // Single-letter weekday
+        return (0..<7).compactMap { cal.date(byAdding: .day, value: $0, to: start).map { formatDate($0, "EEEEE") } }
     }
 
     var body: some View {

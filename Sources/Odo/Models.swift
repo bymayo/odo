@@ -341,12 +341,79 @@ extension Date {
 let kMetersToMiles = 0.000621371
 let kMetersToFeet = 3.28084
 
+/// NumberFormatters are slow to make, so keep one per decimal count
+private var numberFormatters: [Int: NumberFormatter] = [:]
+
 func formatNumber(_ value: Double, decimals: Int = 1) -> String {
-    let formatter = NumberFormatter()
-    formatter.numberStyle = .decimal
-    formatter.minimumFractionDigits = decimals
-    formatter.maximumFractionDigits = decimals
+    let formatter: NumberFormatter
+    if let cached = numberFormatters[decimals] {
+        formatter = cached
+    } else {
+        formatter = NumberFormatter()
+        formatter.numberStyle = .decimal
+        formatter.minimumFractionDigits = decimals
+        formatter.maximumFractionDigits = decimals
+        numberFormatters[decimals] = formatter
+    }
     return formatter.string(from: NSNumber(value: value)) ?? "0"
+}
+
+/// DateFormatters are slow to make too; one per format string
+private var dateFormatters: [String: DateFormatter] = [:]
+
+func formatDate(_ date: Date, _ format: String) -> String {
+    if let f = dateFormatters[format] { return f.string(from: date) }
+    let f = DateFormatter()
+    f.dateFormat = format
+    dateFormatters[format] = f
+    return f.string(from: date)
+}
+
+/// Strava's dates ("2026-11-23T07:30:00Z"), parsed by hand: an
+/// ISO8601DateFormatter takes ~60µs a date, which adds up to most of a
+/// second across a few thousand activities on every redraw.
+enum StravaDate {
+    private static let fallback: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    private static let plain = ISO8601DateFormatter()
+
+    static func parse(_ string: String) -> Date? {
+        if let date = fast(string) { return date }
+        return plain.date(from: string) ?? fallback.date(from: string)
+    }
+
+    /// yyyy-MM-ddTHH:mm:ss then Z (fractional seconds ignored); nil for anything else
+    private static func fast(_ string: String) -> Date? {
+        var utf8 = string.utf8.makeIterator()
+        var bytes: [UInt8] = []
+        bytes.reserveCapacity(20)
+        while let b = utf8.next(), bytes.count < 20 { bytes.append(b) }
+        guard bytes.count >= 20, bytes[4] == 45, bytes[7] == 45, bytes[10] == 84,
+              bytes[13] == 58, bytes[16] == 58, bytes[19] == 90 || bytes[19] == 46 else { return nil }
+        func n(_ from: Int, _ count: Int) -> Int? {
+            var v = 0
+            for i in from..<(from + count) {
+                let d = Int(bytes[i]) - 48
+                guard (0...9).contains(d) else { return nil }
+                v = v * 10 + d
+            }
+            return v
+        }
+        guard let y = n(0, 4), let m = n(5, 2), let d = n(8, 2),
+              let h = n(11, 2), let mi = n(14, 2), let sec = n(17, 2),
+              (1...12).contains(m), (1...31).contains(d) else { return nil }
+        // Days since 1970-01-01 (Howard Hinnant's days_from_civil)
+        let yy = m <= 2 ? y - 1 : y
+        let era = (yy >= 0 ? yy : yy - 399) / 400
+        let yoe = yy - era * 400
+        let doy = (153 * (m + (m > 2 ? -3 : 9)) + 2) / 5 + d - 1
+        let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy
+        let days = era * 146_097 + doe - 719_468
+        return Date(timeIntervalSince1970: TimeInterval(days * 86_400 + h * 3600 + mi * 60 + sec))
+    }
 }
 
 extension Date {
