@@ -3,7 +3,8 @@ import SwiftUI
 struct StatsContentView: View {
     @ObservedObject var viewModel: StravaViewModel
     @ObservedObject var settings = AppSettings.shared
-    @AppStorage("stats_tab") private var tab = "goals"
+    /// Opens on Goals every time (the view is rebuilt when the popover closes)
+    @State private var tab = "goals"
     /// The goal card shown in full; the others collapse to one line
     @AppStorage("expanded_goal") private var expandedGoal = "distance"
     @State private var showFilters = false

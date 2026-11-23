@@ -31,7 +31,7 @@ class SettingsWindowController {
     }
 }
 
-class AppDelegate: NSObject, NSApplicationDelegate {
+class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
     private var statusItem: NSStatusItem!
     private var popover: NSPopover!
     private var viewModel: StravaViewModel!
@@ -56,6 +56,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
         popover = NSPopover()
         popover.behavior = .transient
+        popover.delegate = self
         // The popover follows PopoverView's own height, which fits its content
         let host = NSHostingController(rootView: PopoverView(viewModel: viewModel))
         host.sizingOptions = .preferredContentSize
@@ -108,6 +109,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.closePopover()
             }
         }
+    }
+
+    /// However it closed (click outside, menu bar icon, Esc), reset for next time
+    func popoverDidClose(_ notification: Notification) {
+        if let monitor = eventMonitor {
+            NSEvent.removeMonitor(monitor)
+            eventMonitor = nil
+        }
+        Task { @MainActor in viewModel.resetPopover() }
     }
 
     private func closePopover() {

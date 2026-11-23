@@ -69,6 +69,7 @@ struct PopoverView: View {
                         .padding(.vertical, 10)
                         .measureHeight("content")
                 }
+                .id(viewModel.popoverSession) // fresh on every open
 
                 footerView
                     .measureHeight("footer")

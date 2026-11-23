@@ -485,6 +485,16 @@ class StravaViewModel: ObservableObject {
         }
     }
 
+    /// Bumped each time the popover closes; the popover's content is keyed on it,
+    /// so the next open starts fresh (Goals tab, filters shut, graphs unlocked, scrolled to top)
+    @Published private(set) var popoverSession = 0
+
+    /// Called when the popover closes: back to the menu bar's sport and a fresh view
+    func resetPopover() {
+        selectMenuBarSport()
+        popoverSession += 1
+    }
+
     var menuBarText: String {
         guard let yearActivities = activities[currentYear],
               let sport = menuBarSportCategory else { return "—" }
