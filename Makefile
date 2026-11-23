@@ -4,6 +4,7 @@
 #   make package                  build and wrap in a DMG (unsigned, this Mac only)
 #   make package SIGN=1           the same, signed and notarised (reads .env.local)
 #   make release VERSION=1.0.1    bump, tag and push — CI builds the rest
+#   make icon                     redraw Packaging/AppIcon.icns and .png from OdoMark.swift
 
 APP_NAME   := Odo
 INFO_PLIST := Packaging/Info.plist
@@ -27,7 +28,7 @@ export APP_PASSWORD
 SHELL := /bin/bash
 
 .DEFAULT_GOAL := help
-.PHONY: help dev app run stop package release clean
+.PHONY: help dev app run stop package release icon clean
 
 help:
 	@echo "$(APP_NAME) $(VERSION)"
@@ -71,6 +72,11 @@ release:
 		exit 1; \
 	fi
 	@./Scripts/prepare-release.sh "$(VERSION)"
+
+icon:
+	@mkdir -p .build
+	@swiftc Scripts/AppIcon/main.swift Sources/Odo/OdoMark.swift -o .build/appicon
+	@.build/appicon Packaging/AppIcon.icns
 
 clean:
 	@rm -rf $(BUILD) .build

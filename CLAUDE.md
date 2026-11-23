@@ -11,12 +11,14 @@ make dev              # swift run: bare executable, no Sparkle, LaunchAgent fall
 make package          # build Release and wrap it in a DMG (this Mac only)
 make package SIGN=1   # the same, signed and notarised (reads .env.local)
 make release VERSION=1.0.1   # bump Info.plist, commit, tag and push
+make icon             # redraw Packaging/AppIcon.icns and .png from OdoMark.swift
 make clean            # remove build/ and .build/
 ```
 
 ## Architecture
 
 - `Sources/Odo/`: all app code. `AppDelegate` owns the status item and popover; `StravaViewModel` fetches, caches (`~/Library/Application Support/Odo`) and derives stats; `AppSettings` wraps UserDefaults.
+- `OdoMark` draws the running-track mark: the menu bar template image, the popover header and, via `Scripts/AppIcon` (`make icon`), `Packaging/AppIcon.icns` and a 1024px `AppIcon.png`. Change the shape there and rerun `make icon`; both are committed.
 - `Packaging/`: `Info.plist` (version, bundle ID `uk.co.bymayo.odo`, `SUFeedURL`, `SUPublicEDKey`) and entitlements. `Scripts/build-dmg.sh` assembles `Odo.app` from the package build; there is no Xcode-generated plist.
 - `AppInfo.isBundled` separates Odo.app from `swift run`. Sparkle (`Updater`) and SMAppService (`LaunchAtLogin`) only work in the bundle; dev builds skip updates and use a LaunchAgent.
 - `LegacyMigration` copies settings from the old `StravaBar` and bare-executable `Odo` defaults domains into the bundle's, moves the cache and swaps old launch agents. It runs once, before anything reads settings.

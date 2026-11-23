@@ -47,7 +47,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "figure.run", accessibilityDescription: "Odo")
+            button.image = OdoMark.menuBarImage()
             button.imagePosition = .imageLeading
             button.title = " —"
             button.action = #selector(togglePopover)
@@ -77,10 +77,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    @objc private func togglePopover() {
+    @MainActor @objc private func togglePopover() {
         if popover.isShown {
             closePopover()
         } else if let button = statusItem.button {
+            // Open on the sport the menu bar shows, whichever tab was left open
+            viewModel.selectMenuBarSport()
             // Leave room for the menu bar, the popover's arrow and a margin below
             if let screen = button.window?.screen {
                 PopoverLayout.shared.maxHeight = max(screen.visibleFrame.height - 30, 320)
@@ -134,13 +136,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         guard let button = statusItem.button else { return }
-
-        // Icon follows the menu bar sport
-        if let icon = viewModel.menuBarSportCategory?.icon,
-           let image = NSImage(systemSymbolName: icon, accessibilityDescription: "Odo") {
-            image.isTemplate = true
-            button.image = image
-        }
 
         let font = NSFont.menuBarFont(ofSize: 0)
         let title = NSMutableAttributedString(string: " ", attributes: [.font: font])

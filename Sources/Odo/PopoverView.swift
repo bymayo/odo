@@ -84,9 +84,8 @@ struct PopoverView: View {
     private var headerView: some View {
         HStack {
             HStack(spacing: 9) {
-                Image(systemName: "chart.line.uptrend.xyaxis")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
+                OdoMarkView(lineWidth: 2.2)
+                    .frame(width: 18, height: 18)
                     .frame(width: 26, height: 26)
                     .background(Theme.card)
                     .cornerRadius(7)
@@ -234,5 +233,30 @@ struct PopoverView: View {
                     .font(.system(size: 10))
             }
         }
+    }
+}
+
+// MARK: - Mark
+
+/// The mark in the app's colours, for the popover header
+struct OdoMarkView: View {
+    var lineWidth: CGFloat = 2.4
+
+    var body: some View {
+        Canvas { ctx, size in
+            let bounds = CGRect(origin: .zero, size: size)
+            // Canvas is y-down; flip so the start line sits at the bottom
+            let flip = CGAffineTransform(translationX: 0, y: size.height).scaledBy(x: 1, y: -1)
+            let path = Path(OdoMark.trackPath(in: bounds, lineWidth: lineWidth)).applying(flip)
+            let length = OdoMark.perimeter(in: bounds, lineWidth: lineWidth)
+
+            ctx.stroke(path, with: .color(Theme.ink.opacity(0.18)),
+                       style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
+            ctx.stroke(path, with: .color(Theme.accent),
+                       style: StrokeStyle(lineWidth: lineWidth, lineCap: .round,
+                                          dash: [length * OdoMark.progress, length]))
+        }
+        .aspectRatio(OdoMark.aspect, contentMode: .fit)
+        .accessibilityLabel("Odo")
     }
 }

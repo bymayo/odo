@@ -390,6 +390,13 @@ class StravaViewModel: ObservableObject {
         return detectedSports.first
     }
 
+    /// Switches the popover to the menu bar's sport, if it's one of the tabs
+    func selectMenuBarSport() {
+        if let sport = menuBarSportCategory, availableSports.contains(sport) {
+            selectedSport = sport
+        }
+    }
+
     var menuBarText: String {
         guard let yearActivities = activities[currentYear],
               let sport = menuBarSportCategory else { return "—" }
@@ -662,9 +669,11 @@ class StravaViewModel: ObservableObject {
         // "All" only means something with more than one sport to combine
         availableSports = visible.count > 1 ? [.all] + visible : visible
 
-        // If selectedSport is nil or was hidden, select the first sport
+        // If selectedSport is nil or was hidden, start on the menu bar's sport
         if let selected = selectedSport, availableSports.contains(selected) {
             // keep current selection
+        } else if let sport = menuBarSportCategory, availableSports.contains(sport) {
+            selectedSport = sport
         } else {
             selectedSport = visible.first
         }

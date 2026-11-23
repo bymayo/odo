@@ -50,8 +50,8 @@ private struct GeneralSettings: View {
         SettingsSection("Menu bar") {
             // Live preview, styled like the menu bar item
             HStack(spacing: 6) {
-                Image(systemName: viewModel.menuBarSportCategory?.icon ?? "figure.run")
-                    .font(.system(size: 11))
+                Image(nsImage: OdoMark.menuBarImage())
+                    .renderingMode(.template)
                 if settings.menuBarShowPace, let onPace = viewModel.menuBarOnPace {
                     Circle()
                         .fill(onPace ? Color.green : Color.red)
