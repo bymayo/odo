@@ -19,4 +19,5 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 - The window fits its content, and never runs off the bottom of a smaller screen.
 - A new icon: a running track with your lap drawn round it, in the menu bar and the app.
 - Opening Odo from the menu bar shows the sport the menu bar is set to.
+- When you're behind, each goal shows what you need each week to get on pace in one clear line; hover it for the detail.
 - Updates install automatically.

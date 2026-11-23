@@ -183,58 +183,36 @@ struct ChallengeProgressView: View {
         useTimeFormat ? "\(formatTime(value))/wk" : "\(formatNumber(value, decimals: value >= 100 ? 0 : 1)) \(unit)/wk"
     }
 
-    /// Weekly amount the pace line rises by (goal spread evenly over the year)
-    private var pacePerWeek: Double { goal / (daysInYear / 7) }
-
     private func amount(_ value: Double) -> String {
         useTimeFormat ? formatTime(value) : "\(formatNumber(value, decimals: value >= 100 ? 0 : 1)) \(unit)"
     }
 
-    /// Pacebar-style note: what it takes this week to get back on pace
+    /// Shown when behind: the weekly amount that gets you back on pace
     private var weeklyCallout: some View {
-        let reached = current >= goal
-        let behind = aheadBehind < 0
+        HStack(spacing: 10) {
+            Image(systemName: "arrow.up.right")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundColor(.white)
+                .frame(width: 20, height: 20)
+                .background(Circle().fill(Theme.negative))
 
-        return HStack(alignment: .top, spacing: 12) {
-            RoundedRectangle(cornerRadius: 1)
-                .fill(behind ? Theme.negative : Theme.accent)
-                .frame(width: 2.5)
+            Text("To get on pace")
+                .font(.system(size: 12, weight: .medium))
+                .foregroundColor(Theme.ink)
 
-            VStack(alignment: .leading, spacing: 3) {
-                if reached {
-                    Text("Goal reached")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Theme.ink)
-                    Text("\(amount(current - goal)) over, averaging \(weekly(averagePerWeek))")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textSecondary)
-                } else if behind {
-                    (Text(weekly(neededPerWeek))
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Theme.ink)
-                     + Text(" to get back on pace")
-                        .font(.system(size: 13))
-                        .foregroundColor(Theme.textSecondary))
-                    Text("You're averaging \(weekly(averagePerWeek)), \(weekly(neededPerWeek - averagePerWeek)) more needed")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textTertiary)
-                } else {
-                    (Text("On pace")
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundColor(Theme.ink)
-                     + Text(" · \(amount(aheadBehind)) in hand")
-                        .font(.system(size: 13))
-                        .foregroundColor(Theme.textSecondary))
-                    Text("Pace is \(weekly(pacePerWeek)) · \(weekly(neededPerWeek)) from here still hits \(amount(goal))")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.textTertiary)
-                }
-            }
-            Spacer(minLength: 0)
+            Spacer(minLength: 8)
+
+            Text(weekly(neededPerWeek))
+                .font(.system(size: 13, weight: .bold).monospacedDigit())
+                .foregroundColor(Theme.negative)
+                .lineLimit(1)
+                .fixedSize()
         }
-        .padding(12)
-        .background(Theme.cardRaised.opacity(0.6))
+        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .background(Theme.negative.opacity(0.09))
         .cornerRadius(10)
+        .help("You're averaging \(weekly(averagePerWeek)). \(weekly(neededPerWeek)) from now to the end of the year finishes on \(amount(goal)).")
     }
 
     /// Pacebar-style scale: green fill for progress, dark tick for where you should be today
