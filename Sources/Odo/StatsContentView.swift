@@ -196,7 +196,7 @@ struct StatsContentView: View {
             // broken down by sport
             if viewModel.selectedSport == .all {
                 allWeek(goal: goal)
-            } else if let sport = viewModel.selectedSport, let primary = primaryMetric(goal) {
+            } else if let sport = viewModel.selectedSport, settings.showsWeek(sport), let primary = primaryMetric(goal) {
                 let week = viewModel.currentWeek(sport: sport, metric: primary.metric)
                 let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
                 let weeklyTarget = primary.goal / (daysInYear / 7)
@@ -264,7 +264,9 @@ struct StatsContentView: View {
                 )
             }
 
-            if goal.distanceMiles <= 0 && goal.elevationFeet <= 0 && goal.timeHours <= 0 {
+            // Only when the tab would otherwise be empty: All always has its This week card
+            if goal.distanceMiles <= 0 && goal.elevationFeet <= 0 && goal.timeHours <= 0,
+               viewModel.selectedSport != .all {
                 HStack {
                     Spacer()
                     VStack(spacing: 4) {

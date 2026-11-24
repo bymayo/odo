@@ -6,7 +6,7 @@ package (no Xcode project), SwiftUI + AppKit, macOS 13+, auto-updates via Sparkl
 ## Commands
 
 ```sh
-make run              # build Odo.app (ad-hoc signed) and launch it
+make run              # build Odo Preview.app (ad-hoc signed) and launch it beside the installed Odo
 make dev              # swift run: bare executable, no Sparkle, LaunchAgent fallback
 make package          # build Release and wrap it in a DMG (this Mac only)
 make package SIGN=1   # the same, signed and notarised (reads .env.local)
@@ -23,6 +23,7 @@ make clean            # remove build/ and .build/
 - `Notifier` sends kudos for activities new since the last sync (current year only, none on the first sync, none older than three days), and the week/month/year summaries and pace reminders after each sync, for the menu bar's sport and metric; it records each period it has sent in UserDefaults so nothing repeats, and is inert in dev builds (no bundle). `CatchUp` (Pace.swift) works out the catch-up rate and the automatic doable target, shared by the goal cards and the pace reminder.
 - `Fonts` registers Switzer (Indian Type Foundry, Fontshare) from `Contents/Resources/Fonts`; use `.font(.odo(size:weight:))`, never `.system`. Its licence allows embedding in the app but not hosting in this public repo, so `Scripts/fetch-fonts.sh` downloads it into `.fonts/` (gitignored) on every build; signed builds fail without it, and `swift run` falls back to the system font.
 - `Packaging/`: `Info.plist` (version, bundle ID `uk.co.bymayo.odo`, `SUFeedURL`, `SUPublicEDKey`) and entitlements (empty: not sandboxed, because Odo runs a localhost OAuth callback and dev builds write a LaunchAgent; the hardened runtime comes from `--options runtime`). Keep comments out of the entitlements file: codesign's parser rejects them even though `plutil` passes it. `Scripts/build-dmg.sh` assembles `Odo.app` from the package build; there is no Xcode-generated plist.
+- `make run` builds **Odo Preview.app** (`build-dmg.sh --preview`): bundle ID `uk.co.bymayo.odo.preview`, process `OdoPreview`, a hammer beside the menu bar mark. `AppInfo.isPreview` turns off Sparkle, launch at login, legacy migration and automatic notifications (tests still send), and `AppInfo.settingsDefaults` points settings and the Strava login at the installed app's `uk.co.bymayo.odo` domain, so both stay signed in with the same refresh token. Changing settings in the preview changes them for the installed app. `make stop` only ever quits the preview. Packaged and released builds are never previews.
 - `AppInfo.isBundled` separates Odo.app from `swift run`. Sparkle (`Updater`) and SMAppService (`LaunchAtLogin`) only work in the bundle; dev builds skip updates and use a LaunchAgent.
 - `LegacyMigration` copies settings from the old `StravaBar` and bare-executable `Odo` defaults domains into the bundle's, moves the cache and swaps old launch agents. It runs once, before anything reads settings.
 

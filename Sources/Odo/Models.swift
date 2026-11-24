@@ -18,14 +18,18 @@ enum Theme {
     static let brandBlack = Color(nsColor: NSColor(srgbRed: 0x0B / 255.0, green: 0x0B / 255.0, blue: 0x0B / 255.0, alpha: 1))
 
     // The one accent, reserved for data (current year, progress, markers).
-    // Lime in dark mode; lime washes out on light grey, so light mode goes black.
-    /// Fills: bars, progress, areas and switches
-    static let accent = dynamic(light: 0x0B0B0B, dark: 0xDCFF50)
-    /// Lines, dots and text
-    static let accentInk = accent
+    // Brand lime for fills in both appearances; on light grey a thin lime line
+    // or lime text won't read, so light mode draws those in black.
+    /// Fills: bars, progress, day dots and switches
+    static let accent = dynamic(light: 0xC3E62E, dark: 0xDCFF50)
+    /// Chart lines and their dots: a deeper lime, so a 2pt line holds up on light grey
+    static let accentInk = dynamic(light: 0x7FAA00, dark: 0xDCFF50)
+    /// The "you are here" tick at the end of a lime fill
+    static let progressTick = dynamic(light: 0x0B0B0B, dark: 0xDCFF50)
     /// Soft fill under a line chart, solid so it reads the same on any card
-    static let accentWash = dynamic(light: 0xD9D9D9, dark: 0x3C4220)
-    static let positive = dynamic(light: 0x0B0B0B, dark: 0xDCFF50)
+    static let accentWash = dynamic(light: 0xDDEDA6, dark: 0x3C4220)
+    /// Ahead of pace, up on last year: lime, deepened in light mode to read as text
+    static let positive = dynamic(light: 0x4D7A00, dark: 0xDCFF50)
     /// Behind pace or down on last year: plain ink, so the minus sign does the
     /// work and red stays for things that are actually wrong
     static let behind = ink
@@ -284,11 +288,33 @@ struct SportGoal: Codable, Equatable {
     var distanceMiles: Double
     var elevationFeet: Double
     var timeHours: Double
+    /// Goals switched off in Settings, keeping their numbers: "distance",
+    /// "elevation", "time", and "week" for the This week card
+    var off: Set<String> = []
 
-    init(distanceMiles: Double, elevationFeet: Double, timeHours: Double = 0) {
+    init(distanceMiles: Double, elevationFeet: Double, timeHours: Double = 0, off: Set<String> = []) {
         self.distanceMiles = distanceMiles
         self.elevationFeet = elevationFeet
         self.timeHours = timeHours
+        self.off = off
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        distanceMiles = try c.decode(Double.self, forKey: .distanceMiles)
+        elevationFeet = try c.decode(Double.self, forKey: .elevationFeet)
+        timeHours = try c.decodeIfPresent(Double.self, forKey: .timeHours) ?? 0
+        off = try c.decodeIfPresent(Set<String>.self, forKey: .off) ?? []
+    }
+
+    func isOn(_ key: String) -> Bool { !off.contains(key) }
+
+    /// The goal as the popover sees it: switched-off goals read as 0
+    var effective: SportGoal {
+        SportGoal(distanceMiles: isOn("distance") ? distanceMiles : 0,
+                  elevationFeet: isOn("elevation") ? elevationFeet : 0,
+                  timeHours: isOn("time") ? timeHours : 0,
+                  off: off)
     }
 }
 

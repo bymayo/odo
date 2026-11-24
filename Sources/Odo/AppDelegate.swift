@@ -3,6 +3,7 @@ import SwiftUI
 
 class SettingsWindowController {
     static let shared = SettingsWindowController()
+    static let size = NSSize(width: 700, height: 580)
     private var window: NSWindow?
 
     func open(viewModel: StravaViewModel) {
@@ -21,7 +22,8 @@ class SettingsWindowController {
         window.titlebarAppearsTransparent = true
         window.titleVisibility = .hidden
         window.isMovableByWindowBackground = true
-        window.setContentSize(NSSize(width: 420, height: 560))
+        window.backgroundColor = NSColor(Theme.background)
+        window.setContentSize(Self.size)
         window.center()
         window.isReleasedWhenClosed = false
         window.makeKeyAndOrderFront(nil)
@@ -47,7 +49,7 @@ class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelegate {
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
 
         if let button = statusItem.button {
-            button.image = OdoMark.menuBarImage()
+            button.image = AppInfo.isPreview ? OdoMark.previewMenuBarImage() : OdoMark.menuBarImage()
             button.imagePosition = .imageLeading
             button.title = " —"
             button.action = #selector(togglePopover)

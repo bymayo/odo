@@ -6,6 +6,13 @@ Sparkle shows in the app — so write it for the person receiving the update.
 
 Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 
+## 1.0.1
+
+- Turn each goal, and the This week card, on or off per sport. Switching one off keeps its number for later
+- Clearer goal editing: the number sits in an input box, and "Suggest a goal" is a proper button with a tidier set of suggestions
+- A bigger Settings window with larger controls and its pages listed down the left: General, Menu bar, Goals, Sports, Fitness, Notifications, Account, Updates and a new About page
+- Lime progress bars, chart lines and ahead-of-pace figures in light mode too, in deeper shades so they stay readable
+
 ## 1.0.0
 
 - First release of **Odo**: your yearly goals in the menu bar, from your Strava activities.

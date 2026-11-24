@@ -800,7 +800,7 @@ class StravaViewModel: ObservableObject {
     /// Pre-fill goals for any sport with none set, using the smart "Beat" suggestion
     func prefillGoalsFromLastYear() {
         for sport in availableSports {
-            let existing = settings.goalFor(sport)
+            let existing = settings.storedGoal(for: sport)
             if existing.distanceMiles == 0 && existing.elevationFeet == 0 && existing.timeHours == 0,
                lastYearStats(for: sport) != nil {
                 applyDefaultSmartGoals(for: sport)

@@ -11,7 +11,7 @@ enum LegacyMigration {
 
     static func run() {
         let defaults = UserDefaults.standard
-        guard !defaults.bool(forKey: doneKey) else { return }
+        guard !AppInfo.isPreview, !defaults.bool(forKey: doneKey) else { return }
         let fm = FileManager.default
 
         // 1. Settings + Strava login: fill anything not already set

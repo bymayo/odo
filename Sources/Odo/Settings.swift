@@ -4,7 +4,7 @@ import SwiftUI
 class AppSettings: ObservableObject {
     static let shared = AppSettings()
 
-    private let defaults = UserDefaults.standard
+    private let defaults = AppInfo.settingsDefaults
 
     @Published var clientId: String {
         didSet { defaults.set(clientId, forKey: "strava_client_id") }
@@ -31,8 +31,19 @@ class AppSettings: ObservableObject {
         didSet { saveSportGoals() }
     }
 
+    /// The goal as shown: anything switched off reads as 0
     func goalFor(_ sport: SportCategory) -> SportGoal {
+        storedGoal(for: sport).effective
+    }
+
+    /// The goal as saved, including the numbers of goals switched off
+    func storedGoal(for sport: SportCategory) -> SportGoal {
         sportGoals[sport.rawValue] ?? SportGoal(distanceMiles: 0, elevationFeet: 0)
+    }
+
+    /// Whether the This week card shows for this sport
+    func showsWeek(_ sport: SportCategory) -> Bool {
+        storedGoal(for: sport).isOn("week")
     }
 
     func setGoal(_ goal: SportGoal, for sport: SportCategory) {
@@ -200,14 +211,16 @@ class AppSettings: ObservableObject {
                 converted[key] = SportGoal(
                     distanceMiles: goal.distanceMiles * 1.60934,
                     elevationFeet: goal.elevationFeet * 0.3048,
-                    timeHours: goal.timeHours
+                    timeHours: goal.timeHours,
+                    off: goal.off
                 )
             } else {
                 // km → miles, m → feet
                 converted[key] = SportGoal(
                     distanceMiles: goal.distanceMiles * 0.621371,
                     elevationFeet: goal.elevationFeet * 3.28084,
-                    timeHours: goal.timeHours
+                    timeHours: goal.timeHours,
+                    off: goal.off
                 )
             }
         }

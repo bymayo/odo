@@ -5,36 +5,120 @@ struct SettingsView: View {
     @ObservedObject var settings = AppSettings.shared
     @AppStorage("settings_tab") private var tab = "general"
 
-    private let tabs: [(id: String, title: String, icon: String)] = [
-        ("general", "General", "gearshape"),
-        ("goals", "Goals", "target"),
-        ("sports", "Sports", "figure.mixed.cardio"),
-        ("account", "Account", "person.crop.circle"),
+    struct Page: Identifiable {
+        let id: String
+        let title: String
+        let icon: String
+        let subtitle: String
+    }
+
+    static let pages: [Page] = [
+        Page(id: "general", title: "General", icon: "gearshape", subtitle: "Units, refreshing and startup"),
+        Page(id: "menubar", title: "Menu bar", icon: "menubar.rectangle", subtitle: "What the menu bar shows"),
+        Page(id: "goals", title: "Goals", icon: "target", subtitle: ""),
+        Page(id: "sports", title: "Sports", icon: "figure.mixed.cardio", subtitle: "Sport tabs and years to compare"),
+        Page(id: "fitness", title: "Fitness", icon: "waveform.path.ecg", subtitle: "Heart rate for training load"),
+        Page(id: "notifications", title: "Notifications", icon: "bell", subtitle: "Kudos, summaries and pace reminders"),
+        Page(id: "account", title: "Account", icon: "person.crop.circle", subtitle: "Your Strava connection"),
+        Page(id: "updates", title: "Updates", icon: "arrow.down.circle", subtitle: "Odo \(AppInfo.version)"),
+        Page(id: "about", title: "About", icon: "info.circle", subtitle: "Who makes Odo"),
     ]
 
-    var body: some View {
-        VStack(spacing: 0) {
-            PillTabs(tabs: tabs, selection: $tab)
-                .padding(.horizontal, 20)
-                .padding(.top, 34) // clear the transparent title bar
-                .padding(.bottom, 14)
+    private var page: Page { Self.pages.first { $0.id == tab } ?? Self.pages[0] }
 
+    var body: some View {
+        HStack(spacing: 0) {
+            sidebar
+            Rectangle().fill(Theme.hairline).frame(width: 1)
             ScrollView {
                 VStack(alignment: .leading, spacing: 18) {
-                    switch tab {
+                    VStack(alignment: .leading, spacing: 3) {
+                        Text(page.title)
+                            .font(.odo(size: 22, weight: .bold))
+                            .foregroundColor(Theme.ink)
+                        if !page.subtitle.isEmpty {
+                            Text(page.subtitle)
+                                .font(.odo(size: 12))
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                    }
+                    .padding(.bottom, 2)
+
+                    switch page.id {
+                    case "menubar": MenuBarSettings(viewModel: viewModel, settings: settings)
                     case "goals": GoalsSettings(viewModel: viewModel, settings: settings)
                     case "sports": SportsSettings(viewModel: viewModel, settings: settings)
+                    case "fitness": FitnessSettings(viewModel: viewModel, settings: settings)
+                    case "notifications": NotificationsSection(viewModel: viewModel, settings: settings)
                     case "account": AccountSettings(viewModel: viewModel)
+                    case "updates": UpdatesSection()
+                    case "about": AboutSection()
                     default: GeneralSettings(viewModel: viewModel, settings: settings)
                     }
                 }
-                .padding(.horizontal, 20)
-                .padding(.bottom, 20)
+                .padding(.horizontal, 28)
+                .padding(.top, 40) // clear the transparent title bar
+                .padding(.bottom, 24)
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+            .id(page.id) // start each page at the top
         }
-        .frame(width: 420, height: 560)
+        // Fill the window, title bar included, so no window background shows through
+        .frame(minWidth: SettingsWindowController.size.width, maxWidth: .infinity,
+               minHeight: SettingsWindowController.size.height, maxHeight: .infinity)
         .background(Theme.background)
         .ignoresSafeArea()
+    }
+
+    private var sidebar: some View {
+        VStack(alignment: .leading, spacing: 2) {
+            HStack(spacing: 8) {
+                OdoMarkView(lineWidth: 2)
+                    .frame(width: 16, height: 16)
+                    .frame(width: 24, height: 24)
+                    .background(Theme.brandBlack)
+                    .cornerRadius(6)
+                Text("Odo")
+                    .font(.odo(size: 14, weight: .semibold))
+                    .foregroundColor(Theme.ink)
+            }
+            .padding(.horizontal, 8)
+            .padding(.bottom, 14)
+
+            ForEach(Self.pages) { item in
+                let selected = item.id == page.id
+                Button(action: { tab = item.id }) {
+                    HStack(spacing: 9) {
+                        Image(systemName: item.icon)
+                            .font(.odo(size: 12, weight: .medium))
+                            .frame(width: 18)
+                        Text(item.title)
+                            .font(.odo(size: 13, weight: selected ? .medium : .regular))
+                        Spacer(minLength: 0)
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 7)
+                    .foregroundColor(selected ? Theme.ink : Theme.textSecondary)
+                    .background(selected ? Theme.cardRaised : Color.clear)
+                    .cornerRadius(7)
+                    .shadow(color: selected ? Color.black.opacity(0.06) : .clear, radius: 1, y: 1)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+            }
+
+            Spacer()
+
+            Text("Version \(AppInfo.version)")
+                .font(.odo(size: 11))
+                .foregroundColor(Theme.textTertiary)
+                .padding(.horizontal, 8)
+        }
+        .padding(.horizontal, 12)
+        .padding(.top, 44) // below the traffic lights
+        .padding(.bottom, 16)
+        .frame(width: 190)
+        .background(Theme.card.opacity(0.5))
     }
 }
 
@@ -47,64 +131,8 @@ private struct GeneralSettings: View {
     @State private var launchAtLoginError: String?
 
     var body: some View {
-        SettingsSection("Menu bar") {
-            // Live preview, styled like the menu bar item
-            HStack(spacing: 6) {
-                Image(nsImage: OdoMark.menuBarImage())
-                    .renderingMode(.template)
-                if settings.menuBarShowPace, let onPace = viewModel.menuBarOnPace {
-                    Circle()
-                        .fill(onPace ? Color.green : Color.red)
-                        .frame(width: 5, height: 5)
-                }
-                Text(viewModel.menuBarText)
-                    .font(.odo(size: 12).monospacedDigit())
-            }
-            .foregroundColor(Theme.ink)
-            .padding(.horizontal, 10)
-            .padding(.vertical, 5)
-            .background(Theme.cardRaised)
-            .cornerRadius(7)
-            .frame(maxWidth: .infinity)
-            .padding(.vertical, 8)
-
-            SettingsDivider()
-
-            SettingsRow("Sport") {
-                Picker("", selection: $settings.menuBarSport) {
-                    if viewModel.detectedSports.count > 1 {
-                        Text(SportCategory.all.displayName).tag(SportCategory.all.rawValue)
-                    }
-                    ForEach(viewModel.detectedSports) { sport in
-                        Text(sport.rawValue).tag(sport.rawValue)
-                    }
-                }
-                .labelsHidden()
-                .fixedSize()
-            }
-            SettingsDivider()
-            SettingsRow("Show") {
-                Picker("", selection: $settings.menuBarMetric) {
-                    Text("Distance").tag("distance")
-                    Text("Elevation").tag("elevation")
-                    Text("Time").tag("time")
-                }
-                .pickerStyle(.segmented)
-                .labelsHidden()
-                .fixedSize()
-            }
-            SettingsDivider()
-            SettingsRow("Show goal", detail: "e.g. 3,326 / 5,200 mi") {
-                Toggle("", isOn: $settings.menuBarShowGoal).settingsSwitch()
-            }
-            SettingsDivider()
-            SettingsRow("Pace dot", detail: "Green when on pace, red when behind") {
-                Toggle("", isOn: $settings.menuBarShowPace).settingsSwitch()
-            }
-        }
-
         SettingsSection("Units") {
-            SettingsRow("Units") {
+            SettingsRow("Distance and elevation") {
                 Picker("", selection: $settings.useMetricUnits) {
                     Text("Miles · feet").tag(false)
                     Text("Km · metres").tag(true)
@@ -115,20 +143,7 @@ private struct GeneralSettings: View {
             }
         }
 
-        NotificationsSection(viewModel: viewModel, settings: settings)
-
-        SettingsSection("Heart rate", footer: "Used to work out training load on the Fitness tab. Leave max blank to use the highest Odo has seen on your activities.") {
-            SettingsRow("Max heart rate") {
-                HeartRateField(value: $settings.maxHeartRate,
-                               placeholder: viewModel.detectedMaxHeartRate.map(String.init) ?? "Auto")
-            }
-            SettingsDivider()
-            SettingsRow("Resting heart rate") {
-                HeartRateField(value: $settings.restingHeartRate, placeholder: "60")
-            }
-        }
-
-        SettingsSection("App") {
+        SettingsSection("Syncing", footer: "How often Odo fetches new activities from Strava.") {
             SettingsRow("Auto-refresh") {
                 Picker("", selection: $settings.refreshIntervalMinutes) {
                     Text("Manual").tag(0)
@@ -143,8 +158,10 @@ private struct GeneralSettings: View {
                     viewModel.startRefreshTimer()
                 }
             }
-            SettingsDivider()
-            SettingsRow("Launch at startup", detail: launchAtLoginError) {
+        }
+
+        SettingsSection("Startup") {
+            SettingsRow("Launch at login", detail: launchAtLoginError) {
                 Toggle("", isOn: Binding(
                     get: { launchAtLogin },
                     set: { enabled in
@@ -160,8 +177,184 @@ private struct GeneralSettings: View {
                 .settingsSwitch()
             }
         }
+    }
+}
 
-        UpdatesSection()
+// MARK: - Menu bar
+
+private struct MenuBarSettings: View {
+    @ObservedObject var viewModel: StravaViewModel
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        // Live preview, styled like the menu bar item
+        HStack(spacing: 6) {
+            Image(nsImage: OdoMark.menuBarImage())
+                .renderingMode(.template)
+            if settings.menuBarShowPace, let onPace = viewModel.menuBarOnPace {
+                Circle()
+                    .fill(onPace ? Color.green : Color.red)
+                    .frame(width: 5, height: 5)
+            }
+            Text(viewModel.menuBarText)
+                .font(.odo(size: 12).monospacedDigit())
+        }
+        .foregroundColor(Theme.ink)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 6)
+        .background(Theme.cardRaised)
+        .cornerRadius(7)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 14)
+        .background(Theme.card)
+        .cornerRadius(10)
+
+        SettingsSection("Show") {
+            SettingsRow("Sport") {
+                Picker("", selection: $settings.menuBarSport) {
+                    if viewModel.detectedSports.count > 1 {
+                        Text(SportCategory.all.displayName).tag(SportCategory.all.rawValue)
+                    }
+                    ForEach(viewModel.detectedSports) { sport in
+                        Text(sport.rawValue).tag(sport.rawValue)
+                    }
+                }
+                .labelsHidden()
+                .fixedSize()
+            }
+            SettingsDivider()
+            SettingsRow("Metric") {
+                Picker("", selection: $settings.menuBarMetric) {
+                    Text("Distance").tag("distance")
+                    Text("Elevation").tag("elevation")
+                    Text("Time").tag("time")
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .fixedSize()
+            }
+        }
+
+        SettingsSection("Extras", footer: "The sport also sets which goal the popover opens on, and what notifications report.") {
+            SettingsRow("Show goal", detail: "e.g. 3,326 / 5,200 mi") {
+                Toggle("", isOn: $settings.menuBarShowGoal).settingsSwitch()
+            }
+            SettingsDivider()
+            SettingsRow("Pace dot", detail: "Green when on pace, red when behind") {
+                Toggle("", isOn: $settings.menuBarShowPace).settingsSwitch()
+            }
+        }
+    }
+}
+
+// MARK: - About
+
+/// Links shown on the About page
+enum AppLinks {
+    static let website: URL? = URL(string: "https://odo.bymayo.co.uk")
+    static let author = URL(string: "https://bymayo.co.uk")!
+    static let github = URL(string: "https://github.com/bymayo")!
+    static let x = URL(string: "https://x.com/madebymayo")!
+}
+
+/// Laid out like Cargo's About panel
+private struct AboutSection: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 14) {
+                // The icon the app is actually running with
+                Image(nsImage: NSApplication.shared.applicationIconImage)
+                    .resizable()
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: 56, height: 56)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text("Odo")
+                        .font(.odo(size: 17, weight: .medium))
+                        .foregroundColor(Theme.ink)
+                    Text("Version \(AppInfo.version)")
+                        .font(.odo(size: 12))
+                        .foregroundColor(Theme.textTertiary)
+                }
+                Spacer()
+            }
+
+            if let website = AppLinks.website {
+                SettingsDivider()
+                HStack {
+                    Text("Website")
+                        .font(.odo(size: 14))
+                        .foregroundColor(Theme.textSecondary)
+                    Spacer()
+                    Button(action: { NSWorkspace.shared.open(website) }) {
+                        HStack(spacing: 5) {
+                            Text(website.host ?? website.absoluteString)
+                                .font(.odo(size: 13, weight: .medium))
+                            Image(systemName: "arrow.up.right")
+                                .font(.odo(size: 10, weight: .semibold))
+                        }
+                        .foregroundColor(Theme.ink)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            SettingsDivider()
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("CREATED BY")
+                    .font(.odo(size: 10, weight: .medium))
+                    .tracking(1)
+                    .foregroundColor(Theme.textTertiary)
+                HStack(spacing: 16) {
+                    Text("Jason Mayo")
+                        .font(.odo(size: 14, weight: .medium))
+                        .foregroundColor(Theme.ink)
+                    link("bymayo.co.uk", AppLinks.author)
+                    link("GitHub", AppLinks.github)
+                    link("X", AppLinks.x)
+                }
+            }
+
+            SettingsDivider()
+
+            Text("Odo is an independent project. It is not affiliated with, endorsed by or sponsored by Strava, Inc.")
+                .font(.odo(size: 12))
+                .foregroundColor(Theme.textTertiary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(18)
+        .background(Theme.card)
+        .cornerRadius(14)
+    }
+
+    private func link(_ title: String, _ url: URL) -> some View {
+        Button(action: { NSWorkspace.shared.open(url) }) {
+            Text(title)
+                .font(.odo(size: 13))
+                .underline()
+                .foregroundColor(Theme.textSecondary)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+// MARK: - Fitness
+
+private struct FitnessSettings: View {
+    @ObservedObject var viewModel: StravaViewModel
+    @ObservedObject var settings: AppSettings
+
+    var body: some View {
+        SettingsSection("Heart rate", footer: "Used to work out training load on the Fitness tab. Leave max blank to use the highest Odo has seen on your activities.") {
+            SettingsRow("Max heart rate") {
+                HeartRateField(value: $settings.maxHeartRate,
+                               placeholder: viewModel.detectedMaxHeartRate.map(String.init) ?? "Auto")
+            }
+            SettingsDivider()
+            SettingsRow("Resting heart rate") {
+                HeartRateField(value: $settings.restingHeartRate, placeholder: "60")
+            }
+        }
     }
 }
 
@@ -180,7 +373,7 @@ private struct NotificationsSection: View {
     }
 
     var body: some View {
-        SettingsSection("Notifications", footer: footer) {
+        SettingsSection("Send me", footer: footer) {
             toggle("Kudos", detail: "A well done when a new activity syncs", $settings.notifyKudos)
             SettingsDivider()
             toggle("Weekly summary", detail: "Last week against the week before", $settings.notifyWeekly)
@@ -231,7 +424,7 @@ private struct UpdatesSection: View {
     @ObservedObject private var updater = Updater.shared
 
     var body: some View {
-        SettingsSection("Updates", footer: updater.isAvailable ? nil : "Updates are available in the installed Odo.app, not dev builds.") {
+        SettingsSection("Odo", footer: updater.isAvailable ? nil : "Updates are available in the installed Odo.app, not dev builds.") {
             SettingsRow("Odo \(AppInfo.version)",
                         detail: updater.lastUpdateCheckDate.map { "Last checked \($0.timeAgoDisplay())" },
                         icon: "arrow.down.circle") {
@@ -276,14 +469,9 @@ private struct GoalsSettings: View {
             EmptyNote("No sports yet. Sync your Strava activities first.")
         } else if let sport {
             HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(sport.displayName)
-                        .font(.odo(size: 20, weight: .bold))
-                        .foregroundColor(Theme.ink)
-                    Text("\(String(viewModel.currentYear)) targets · 0 hides a goal · ✦ suggests one")
-                        .font(.odo(size: 11))
-                        .foregroundColor(Theme.textTertiary)
-                }
+                Text("\(sport.displayName) · \(String(viewModel.currentYear))")
+                    .font(.odo(size: 15, weight: .semibold))
+                    .foregroundColor(Theme.ink)
                 Spacer()
                 SportIconTabs(sports: viewModel.availableSports, selection: Binding(
                     get: { sport },
@@ -305,15 +493,27 @@ private struct GoalEditor: View {
     @State private var distance: Double
     @State private var elevation: Double
     @State private var time: Double
+    @State private var off: Set<String>
 
     init(sport: SportCategory, settings: AppSettings, viewModel: StravaViewModel) {
         self.sport = sport
         self.settings = settings
         self.viewModel = viewModel
-        let goal = settings.goalFor(sport)
+        let goal = settings.storedGoal(for: sport)
         _distance = State(initialValue: goal.distanceMiles)
         _elevation = State(initialValue: goal.elevationFeet)
         _time = State(initialValue: goal.timeHours)
+        _off = State(initialValue: goal.off)
+    }
+
+    private func on(_ key: String) -> Binding<Bool> {
+        Binding(
+            get: { !off.contains(key) },
+            set: { enabled in
+                if enabled { off.remove(key) } else { off.insert(key) }
+                save()
+            }
+        )
     }
 
     var body: some View {
@@ -322,13 +522,36 @@ private struct GoalEditor: View {
         let smart = viewModel.smartSuggestions(for: sport)
 
         VStack(spacing: 10) {
-            BigNumberField(label: "Distance", icon: "ruler", value: $distance, unit: settings.distanceUnit,
+            if sport != .all {
+                HStack(spacing: 10) {
+                    Image(systemName: "calendar")
+                        .font(.odo(size: 13, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("This week")
+                            .font(.odo(size: 14))
+                            .foregroundColor(Theme.ink)
+                        Text("Progress against a weekly share of your first goal")
+                            .font(.odo(size: 12))
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                    Spacer()
+                    Toggle("", isOn: on("week")).settingsSwitch()
+                }
+                .padding(16)
+                .background(Theme.card)
+                .cornerRadius(14)
+            }
+
+            BigNumberField(label: "Distance", icon: "ruler", value: $distance, enabled: on("distance"),
+                           unit: settings.distanceUnit,
                            hint: last.map { "\(lastYear): \(formatNumber($0.totalDistance, decimals: 0)) \(settings.distanceUnit)" },
                            suggestions: smart.first { $0.metric == "distance" }, settings: settings)
-            BigNumberField(label: "Elevation", icon: "arrow.up.right", value: $elevation, unit: settings.elevationUnit,
+            BigNumberField(label: "Elevation", icon: "arrow.up.right", value: $elevation, enabled: on("elevation"),
+                           unit: settings.elevationUnit,
                            hint: last.map { "\(lastYear): \(formatNumber($0.totalElevation, decimals: 0)) \(settings.elevationUnit)" },
                            suggestions: smart.first { $0.metric == "elevation" }, settings: settings)
-            BigNumberField(label: "Time", icon: "clock", value: $time, unit: "hrs",
+            BigNumberField(label: "Time", icon: "clock", value: $time, enabled: on("time"), unit: "hrs",
                            hint: last.map { "\(lastYear): \(formatTime($0.totalTime))" },
                            suggestions: smart.first { $0.metric == "time" }, settings: settings)
         }
@@ -338,7 +561,7 @@ private struct GoalEditor: View {
     }
 
     private func save() {
-        settings.setGoal(SportGoal(distanceMiles: distance, elevationFeet: elevation, timeHours: time), for: sport)
+        settings.setGoal(SportGoal(distanceMiles: distance, elevationFeet: elevation, timeHours: time, off: off), for: sport)
     }
 }
 
@@ -347,6 +570,8 @@ private struct BigNumberField: View {
     let label: String
     let icon: String
     @Binding var value: Double
+    /// The goal's on/off switch; off keeps the number but hides the goal
+    @Binding var enabled: Bool
     let unit: String
     let hint: String?
     /// Smart goal options for just this goal
@@ -354,8 +579,14 @@ private struct BigNumberField: View {
     @ObservedObject var settings: AppSettings
 
     @State private var showSmart = false
+    /// What's typed, kept as text so the field can size itself as you type
+    @State private var text = ""
 
     private static let numberFont = Font.odo(size: 38, weight: .bold)
+
+    private static func display(_ value: Double) -> String {
+        value > 0 ? formatNumber(value, decimals: 0) : ""
+    }
 
     private var daysInYear: Double {
         Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
@@ -376,27 +607,33 @@ private struct BigNumberField: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.odo(size: 10, weight: .medium))
+                    .font(.odo(size: 12, weight: .medium))
                 Text(label)
-                    .font(.odo(size: 12))
+                    .font(.odo(size: 14, weight: .medium))
                 Spacer()
                 if let hint {
                     Text(hint)
-                        .font(.odo(size: 10))
+                        .font(.odo(size: 12))
                         .foregroundColor(Theme.textTertiary)
                 }
-                if let suggestions {
+                if let suggestions, enabled {
                     Button(action: { showSmart.toggle() }) {
-                        Image(systemName: "sparkles")
-                            .font(.odo(size: 11, weight: .medium))
-                            .foregroundColor(showSmart ? Theme.ink : Theme.textSecondary)
-                            .frame(width: 22, height: 22)
-                            .background(showSmart ? Theme.cardRaised : Color.clear)
-                            .cornerRadius(6)
-                            .contentShape(Rectangle())
+                        HStack(spacing: 5) {
+                            Image(systemName: "sparkles")
+                                .font(.odo(size: 11, weight: .semibold))
+                            Text("Suggest a goal")
+                                .font(.odo(size: 12, weight: .medium))
+                        }
+                        .foregroundColor(Theme.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(showSmart ? Theme.cardRaised : Theme.cardRaised.opacity(0.6))
+                        .overlay(RoundedRectangle(cornerRadius: 8).stroke(Theme.hairline, lineWidth: 1))
+                        .cornerRadius(8)
+                        .contentShape(Rectangle())
                     }
                     .buttonStyle(.borderless)
-                    .help("Suggest a \(label.lowercased()) goal")
+                    .help("Suggest \(withArticle(label.lowercased())) goal")
                     .popover(isPresented: $showSmart, arrowEdge: .bottom) {
                         SmartGoalPicker(suggestions: suggestions, settings: settings, current: value) { picked in
                             value = picked
@@ -404,31 +641,58 @@ private struct BigNumberField: View {
                         }
                     }
                 }
+                Toggle("", isOn: $enabled)
+                    .settingsSwitch()
+                    .padding(.leading, 4)
+                    .help(enabled ? "Hide this goal" : "Show this goal")
             }
             .foregroundColor(Theme.textSecondary)
 
-            HStack(alignment: .lastTextBaseline, spacing: 6) {
+            // An input box round the number, so it reads as something to type into
+            HStack(alignment: .lastTextBaseline, spacing: 8) {
                 // Hidden text sizes the field to its content, so the unit sits right after the number
                 ZStack(alignment: .leading) {
-                    Text(formatNumber(value, decimals: 0) + "0")
+                    Text(text.isEmpty ? "0" : text)
                         .font(Self.numberFont)
+                        .padding(.trailing, 2) // room for the caret
                         .hidden()
-                    TextField("0", value: $value, format: .number)
+                    TextField("0", text: $text)
                         .textFieldStyle(.plain)
                         .font(Self.numberFont)
                         .foregroundColor(value > 0 ? Theme.ink : Theme.textTertiary)
+                        .onSubmit { text = Self.display(value) }
                 }
                 .fixedSize()
+                .onAppear { text = Self.display(value) }
+                // Typing: keep the digits, and tidy the commas as you go
+                .onChange(of: text) { typed in
+                    let digits = typed.filter(\.isNumber)
+                    let parsed = Double(digits) ?? 0
+                    if parsed != value { value = parsed }
+                    let tidy = digits.isEmpty ? "" : Self.display(parsed)
+                    if tidy != typed { text = tidy }
+                }
+                // A suggestion picked from the popover
+                .onChange(of: value) { new in
+                    if Double(text.filter(\.isNumber)) ?? 0 != new { text = Self.display(new) }
+                }
                 Text(unit)
-                    .font(.odo(size: 13, weight: .medium))
-                    .foregroundColor(Theme.textSecondary)
-                Spacer()
-                Image(systemName: "pencil")
-                    .font(.odo(size: 10))
+                    .font(.odo(size: 14, weight: .medium))
                     .foregroundColor(Theme.textTertiary)
+                Spacer(minLength: 0)
             }
+            .contentShape(Rectangle())
+            .padding(.horizontal, 14)
+            .padding(.vertical, 6)
+            .background(Theme.background.opacity(0.7))
+            .overlay(RoundedRectangle(cornerRadius: 10).stroke(Theme.hairline, lineWidth: 1))
+            .cornerRadius(10)
+            .padding(.vertical, 6)
+            .opacity(enabled ? 1 : 0.4)
+            .disabled(!enabled)
 
-            Text(value > 0 ? breakdown : "No goal · hidden from the popover")
+            Text(!enabled ? "Off · hidden from the popover, your number is kept"
+                 : value > 0 ? breakdown : "No goal set yet")
                 .font(.odo(size: 11).monospacedDigit())
                 .foregroundColor(Theme.textTertiary)
         }
@@ -477,9 +741,9 @@ private struct SportsSettings: View {
                         let on = settings.visibleYears.isEmpty || settings.visibleYears.contains(year)
                         Button(action: { toggle(year, in: previousYears) }) {
                             Text(String(year))
-                                .font(.odo(size: 11, weight: on ? .medium : .regular).monospacedDigit())
-                                .padding(.horizontal, 10)
-                                .padding(.vertical, 5)
+                                .font(.odo(size: 13, weight: on ? .medium : .regular).monospacedDigit())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
                                 .foregroundColor(on ? Theme.ink : Theme.textTertiary)
                                 .background(on ? Theme.cardRaised : Color.clear)
                                 .overlay(RoundedRectangle(cornerRadius: 7).stroke(Theme.hairline, lineWidth: 1))
@@ -551,39 +815,6 @@ private struct AccountSettings: View {
 
 // MARK: - Building blocks
 
-/// Segmented pill tabs, matching the popover's Goals / Year comparison switch
-struct PillTabs: View {
-    let tabs: [(id: String, title: String, icon: String)]
-    @Binding var selection: String
-
-    var body: some View {
-        HStack(spacing: 2) {
-            ForEach(tabs, id: \.id) { tab in
-                let selected = selection == tab.id
-                Button(action: { selection = tab.id }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: tab.icon)
-                            .font(.odo(size: 10, weight: .medium))
-                        Text(tab.title)
-                            .font(.odo(size: 11, weight: selected ? .medium : .regular))
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 6)
-                    .foregroundColor(selected ? Theme.ink : Theme.textSecondary)
-                    .background(selected ? Theme.cardRaised : Color.clear)
-                    .cornerRadius(7)
-                    .shadow(color: selected ? Color.black.opacity(0.06) : .clear, radius: 1, y: 1)
-                    .contentShape(Rectangle())
-                }
-                .buttonStyle(.borderless)
-            }
-        }
-        .padding(3)
-        .background(Theme.card)
-        .cornerRadius(10)
-    }
-}
-
 /// A sport tab's content: the sport's icon, or the word "All"
 struct SportTabLabel: View {
     let sport: SportCategory
@@ -642,21 +873,21 @@ private struct SettingsSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.odo(size: 12))
+                .font(.odo(size: 13, weight: .medium))
                 .foregroundColor(Theme.textSecondary)
                 .padding(.horizontal, 4)
 
             VStack(alignment: .leading, spacing: 0) {
                 content
             }
-            .padding(.horizontal, 14)
+            .padding(.horizontal, 18)
             .padding(.vertical, 4)
             .background(Theme.card)
             .cornerRadius(14)
 
             if let footer {
                 Text(footer)
-                    .font(.odo(size: 10))
+                    .font(.odo(size: 12))
                     .foregroundColor(Theme.textTertiary)
                     .padding(.horizontal, 4)
             }
@@ -681,25 +912,26 @@ private struct SettingsRow<Control: View>: View {
         HStack(spacing: 10) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.odo(size: 12))
+                    .font(.odo(size: 15))
                     .foregroundColor(Theme.textSecondary)
-                    .frame(width: 18)
+                    .frame(width: 22)
             }
-            VStack(alignment: .leading, spacing: 1) {
+            VStack(alignment: .leading, spacing: 2) {
                 Text(title)
-                    .font(.odo(size: 12))
+                    .font(.odo(size: 14))
                     .foregroundColor(Theme.ink)
                 if let detail {
                     Text(detail)
-                        .font(.odo(size: 10))
+                        .font(.odo(size: 12))
                         .foregroundColor(Theme.textTertiary)
                 }
             }
             Spacer(minLength: 12)
             control
-                .controlSize(.small)
+                .controlSize(.regular)
         }
-        .padding(.vertical, 9)
+        .frame(minHeight: 32)
+        .padding(.vertical, 10)
     }
 }
 
@@ -716,9 +948,9 @@ private struct HeartRateField: View {
             ))
             .textFieldStyle(.roundedBorder)
             .multilineTextAlignment(.trailing)
-            .frame(width: 52)
+            .frame(width: 64)
             Text("bpm")
-                .font(.odo(size: 11))
+                .font(.odo(size: 13))
                 .foregroundColor(Theme.textTertiary)
         }
     }

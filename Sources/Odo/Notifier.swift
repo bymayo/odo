@@ -46,7 +46,8 @@ final class Notifier: NSObject, ObservableObject {
     /// Sends whatever's due. `force` sends last week's summary and the pace
     /// reminder now, ignoring the schedule (Settings' "Send a test").
     func check(_ vm: StravaViewModel, now: Date = Date(), force: Bool = false) {
-        guard center != nil, let sport = vm.menuBarSportCategory else { return }
+        // The installed Odo sends these; a preview build only sends tests
+        guard center != nil, !AppInfo.isPreview || force, let sport = vm.menuBarSportCategory else { return }
         let metric = settings.menuBarMetric
         let cal = Calendar.current
         guard force || cal.component(.hour, from: now) >= 8 else { return }
@@ -178,7 +179,7 @@ final class Notifier: NSObject, ObservableObject {
     /// A well done for each newly synced activity from the last few days
     /// `force` skips the setting and the three-day limit (Settings' "Send a test")
     func kudos(for activities: [StravaActivity], vm: StravaViewModel, force: Bool = false) {
-        guard settings.notifyKudos || force, center != nil else { return }
+        guard settings.notifyKudos || force, center != nil, !AppInfo.isPreview || force else { return }
         let recent = Date().addingTimeInterval(-3 * 86_400)
         let fresh = activities.filter { a in
             guard let date = vm.startDate(of: a), force || date >= recent else { return false }

@@ -334,7 +334,7 @@ struct ChallengeProgressView: View {
                     .frame(width: w * progress)
 
                 Rectangle()
-                    .fill(Theme.accentInk)
+                    .fill(Theme.progressTick)
                     .frame(width: 2.5)
                     .offset(x: max(0, w * progress - 1.25))
 

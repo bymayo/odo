@@ -13,6 +13,7 @@ enum LaunchAtLogin {
     }
 
     static var isEnabled: Bool {
+        if AppInfo.isPreview { return false }
         if AppInfo.isBundled {
             return SMAppService.mainApp.status == .enabled
         }
@@ -20,6 +21,10 @@ enum LaunchAtLogin {
     }
 
     static func setEnabled(_ enabled: Bool) throws {
+        if AppInfo.isPreview {
+            throw NSError(domain: label, code: 2,
+                          userInfo: [NSLocalizedDescriptionKey: "Launch at login is set in the installed Odo, not the preview build"])
+        }
         if AppInfo.isBundled {
             if enabled {
                 try SMAppService.mainApp.register()

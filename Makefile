@@ -1,6 +1,6 @@
 # Odo — build, run and package. Mirrors Cargo's Makefile.
 #
-#   make run                      build Odo.app and launch it
+#   make run                      build Odo Preview.app and launch it beside the installed Odo
 #   make package                  build and wrap in a DMG (unsigned, this Mac only)
 #   make package SIGN=1           the same, signed and notarised (reads .env.local)
 #   make release VERSION=1.0.1    bump, tag and push — CI builds the rest
@@ -9,7 +9,9 @@
 APP_NAME   := Odo
 INFO_PLIST := Packaging/Info.plist
 BUILD      := build
-APP        := $(BUILD)/dmg/$(APP_NAME).app
+APP        := $(BUILD)/dmg/$(APP_NAME) Preview.app
+# The preview build's process name; never the installed Odo's
+PREVIEW_PROCESS := OdoPreview
 
 VERSION := $(shell /usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" $(INFO_PLIST) 2>/dev/null || echo 0.0.0)
 DMG     := $(BUILD)/$(APP_NAME)-$(VERSION).dmg
@@ -35,8 +37,8 @@ help:
 	@echo
 	@echo "  make dev       swift run (bare executable, no Sparkle)"
 	@echo "  make app       build $(APP) (ad-hoc signed)"
-	@echo "  make run       build, then launch Odo.app"
-	@echo "  make stop      quit the running app"
+	@echo "  make run       build, then launch it beside the installed Odo"
+	@echo "  make stop      quit the preview build"
 	@echo "  make package   build Release and wrap it in $(DMG)"
 	@echo "  make clean     remove $(BUILD)/ and .build/"
 	@echo
@@ -47,17 +49,17 @@ dev:
 	swift run
 
 app:
-	@./Scripts/build-dmg.sh "$(VERSION)" --app-only
+	@./Scripts/build-dmg.sh "$(VERSION)" --app-only --preview
 
 # Quit first: `open` only raises a copy that's already running.
 run: app stop
 	@open "$(APP)"
-	@echo "Launched $(APP_NAME) $(VERSION) — look for it in the menu bar."
+	@echo "Launched $(APP_NAME) Preview $(VERSION) — the menu bar item with the hammer."
 
 stop:
-	@pkill -x "$(APP_NAME)" 2>/dev/null || true
+	@pkill -x "$(PREVIEW_PROCESS)" 2>/dev/null || true
 	@for i in $$(seq 1 25); do \
-		pgrep -x "$(APP_NAME)" >/dev/null || break; \
+		pgrep -x "$(PREVIEW_PROCESS)" >/dev/null || break; \
 		sleep 0.2; \
 	done
 

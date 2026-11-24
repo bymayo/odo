@@ -4,7 +4,9 @@
 #
 # Usage: ./Scripts/build-dmg.sh <version> [--sign] [--app-only]
 #   --sign      Developer ID + hardened runtime, then notarise and staple
-#   --app-only  stop after build/Odo.app (used by `make app` / `make run`)
+#   --app-only  stop after the .app (used by `make app` / `make run`)
+#   --preview   build "Odo Preview.app" instead: its own bundle ID and process
+#               name, so it runs alongside an installed Odo (`make run`)
 #
 # Signing reads DEVELOPER_ID, TEAM_ID and NOTARY_PROFILE (or APPLE_ID +
 # APP_PASSWORD on CI) from the environment; the Makefile loads .env.local.
@@ -16,7 +18,6 @@ APP_NAME="Odo"
 VERSION="${1:-}"
 BUILD_DIR="build"
 DMG_DIR="${BUILD_DIR}/dmg"
-APP_PATH="${DMG_DIR}/${APP_NAME}.app"
 INFO_PLIST="Packaging/Info.plist"
 ENTITLEMENTS="Packaging/Odo.entitlements"
 ICON="Packaging/AppIcon.icns"
@@ -27,8 +28,17 @@ for arg in "$@"; do
     case "$arg" in
         --sign) SIGN_APP=true ;;
         --app-only) APP_ONLY=true ;;
+        --preview) PREVIEW=true ;;
     esac
 done
+
+# Preview builds: separate identity so the installed Odo keeps running
+if [ "$PREVIEW" = true ]; then
+    BUNDLE_NAME="Odo Preview"; EXECUTABLE="OdoPreview"; BUNDLE_ID="uk.co.bymayo.odo.preview"
+else
+    BUNDLE_NAME="${APP_NAME}"; EXECUTABLE="${APP_NAME}"; BUNDLE_ID=""
+fi
+APP_PATH="${DMG_DIR}/${BUNDLE_NAME}.app"
 
 [ -n "$VERSION" ] || VERSION=$(/usr/libexec/PlistBuddy -c "Print CFBundleShortVersionString" "$INFO_PLIST")
 DMG_PATH="${BUILD_DIR}/${APP_NAME}-${VERSION}.dmg"
@@ -79,11 +89,20 @@ step "Assembling ${APP_NAME}.app..."
 rm -rf "${BUILD_DIR}"
 mkdir -p "${APP_PATH}/Contents/MacOS" "${APP_PATH}/Contents/Frameworks" "${APP_PATH}/Contents/Resources"
 
-cp "${BIN_DIR}/${APP_NAME}" "${APP_PATH}/Contents/MacOS/${APP_NAME}"
+cp "${BIN_DIR}/${APP_NAME}" "${APP_PATH}/Contents/MacOS/${EXECUTABLE}"
 # ditto keeps the framework's symlinks (Versions/Current), which codesign requires
 ditto "${BIN_DIR}/Sparkle.framework" "${APP_PATH}/Contents/Frameworks/Sparkle.framework"
 cp "${INFO_PLIST}" "${APP_PATH}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_PATH}/Contents/Info.plist"
+if [ "$PREVIEW" = true ]; then
+    PLIST="${APP_PATH}/Contents/Info.plist"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleIdentifier ${BUNDLE_ID}" \
+        -c "Set :CFBundleExecutable ${EXECUTABLE}" \
+        -c "Set :CFBundleName ${BUNDLE_NAME}" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Set :CFBundleDisplayName ${BUNDLE_NAME}" "$PLIST" 2>/dev/null \
+        || /usr/libexec/PlistBuddy -c "Add :CFBundleDisplayName string ${BUNDLE_NAME}" "$PLIST"
+    /usr/libexec/PlistBuddy -c "Add :OdoPreview bool true" "$PLIST"
+fi
 [ -f "${ICON}" ] && cp "${ICON}" "${APP_PATH}/Contents/Resources/AppIcon.icns"
 if ls .fonts/*.otf >/dev/null 2>&1; then
     mkdir -p "${APP_PATH}/Contents/Resources/Fonts"

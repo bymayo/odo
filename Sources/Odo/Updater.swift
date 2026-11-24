@@ -9,6 +9,19 @@ enum AppInfo {
         Bundle.main.bundleURL.pathExtension == "app" && Bundle.main.bundleIdentifier != nil
     }
 
+    /// The release's bundle ID, whose settings a preview build shares
+    static let releaseBundleID = "uk.co.bymayo.odo"
+
+    /// True for `make run` builds (Odo Preview.app), which run alongside the
+    /// installed Odo: no updates, login item or automatic notifications, and
+    /// they use the installed app's settings and Strava login
+    static let isPreview = Bundle.main.object(forInfoDictionaryKey: "OdoPreview") as? Bool == true
+
+    /// Where settings and the Strava login live: the installed app's domain,
+    /// even from a preview build, so both stay signed in with the same tokens
+    static let settingsDefaults: UserDefaults =
+        isPreview ? UserDefaults(suiteName: releaseBundleID) ?? .standard : .standard
+
     static var version: String {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "dev"
     }
@@ -32,7 +45,7 @@ final class Updater: ObservableObject {
     var isAvailable: Bool { controller != nil }
 
     private init() {
-        guard AppInfo.isBundled else {
+        guard AppInfo.isBundled, !AppInfo.isPreview else {
             controller = nil
             return
         }

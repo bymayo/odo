@@ -144,7 +144,7 @@ extension StravaViewModel {
 
     /// One-click: apply the Beat suggestion for every metric
     func applyDefaultSmartGoals(for sport: SportCategory) {
-        var goal = settings.goalFor(sport)
+        var goal = settings.storedGoal(for: sport)
         for s in smartSuggestions(for: sport) {
             guard let value = s.defaultOption?.value else { continue }
             switch s.metric {
@@ -161,70 +161,108 @@ extension StravaViewModel {
 // MARK: - Picker
 
 /// One goal's suggestions, in a popover from its card. Picking one sets only that goal.
+/// "a distance", "an elevation"
+func withArticle(_ word: String) -> String {
+    ("aeiou".contains(word.first ?? "x") ? "an " : "a ") + word
+}
+
 struct SmartGoalPicker: View {
     let suggestions: MetricSuggestions
     @ObservedObject var settings: AppSettings
     let current: Double
     var onPick: (Double) -> Void
 
+    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Label("Smart \(suggestions.title.lowercased()) goal", systemImage: "sparkles")
-                    .font(.odo(size: 13, weight: .semibold))
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(alignment: .top, spacing: 10) {
+                Image(systemName: "sparkles")
+                    .font(.odo(size: 14, weight: .semibold))
                     .foregroundColor(Theme.ink)
-                Text(suggestions.basis.prefix(1).uppercased() + suggestions.basis.dropFirst())
-                    .font(.odo(size: 10))
-                    .foregroundColor(Theme.textTertiary)
+                    .frame(width: 30, height: 30)
+                    .background(Theme.cardRaised)
+                    .cornerRadius(8)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Suggest \(withArticle(suggestions.title.lowercased())) goal")
+                        .font(.odo(size: 14, weight: .semibold))
+                        .foregroundColor(Theme.ink)
+                    Text(suggestions.basis.prefix(1).uppercased() + suggestions.basis.dropFirst())
+                        .font(.odo(size: 11))
+                        .foregroundColor(Theme.textTertiary)
+                }
             }
 
-            FlowLayout(spacing: 6) {
+            LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
                 ForEach(suggestions.options) { option in
                     chip(option)
                 }
             }
 
-            HStack(spacing: 14) {
-                Stepper(value: $settings.smartBeatPercent, in: 1...50) {
-                    Text("Beat +\(settings.smartBeatPercent)%")
-                        .font(.odo(size: 11).monospacedDigit())
-                        .foregroundColor(Theme.textSecondary)
-                }
-                Stepper(value: $settings.smartStretchPercent, in: 1...100) {
-                    Text("Stretch +\(settings.smartStretchPercent)%")
-                        .font(.odo(size: 11).monospacedDigit())
-                        .foregroundColor(Theme.textSecondary)
-                }
-            }
-            .controlSize(.small)
+            Rectangle().fill(Theme.hairline).frame(height: 1)
 
-            Text("Only sets this goal.")
-                .font(.odo(size: 10))
+            VStack(spacing: 8) {
+                adjuster("Beat by", value: $settings.smartBeatPercent, range: 1...50)
+                adjuster("Stretch by", value: $settings.smartStretchPercent, range: 1...100)
+            }
+
+            Text("Picking one only changes your \(suggestions.title.lowercased()) goal.")
+                .font(.odo(size: 11))
                 .foregroundColor(Theme.textTertiary)
         }
-        .padding(14)
-        .frame(width: 300, alignment: .leading)
+        .padding(16)
+        .frame(width: 340, alignment: .leading)
+    }
+
+    private func adjuster(_ title: String, value: Binding<Int>, range: ClosedRange<Int>) -> some View {
+        HStack {
+            Text(title)
+                .font(.odo(size: 12))
+                .foregroundColor(Theme.textSecondary)
+            Spacer()
+            Text("+\(value.wrappedValue)%")
+                .font(.odo(size: 12, weight: .medium).monospacedDigit())
+                .foregroundColor(Theme.ink)
+            Stepper("", value: value, in: range)
+                .labelsHidden()
+        }
     }
 
     private func chip(_ option: GoalSuggestion) -> some View {
         let selected = option.value == current
         return Button(action: { onPick(option.value) }) {
-            VStack(alignment: .leading, spacing: 1) {
-                Text(option.label)
-                    .font(.odo(size: 9, weight: .medium))
-                    .foregroundColor(selected ? Theme.background.opacity(0.7) : Theme.textTertiary)
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 4) {
+                    Text(option.label)
+                        .font(.odo(size: 11, weight: .medium))
+                        .foregroundColor(Theme.textSecondary)
+                        .lineLimit(1)
+                    Spacer(minLength: 0)
+                    if selected {
+                        Text("Current")
+                            .font(.odo(size: 9, weight: .semibold))
+                            .foregroundColor(Theme.brandBlack)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Theme.accent)
+                            .cornerRadius(4)
+                    }
+                }
                 Text(formatNumber(option.value, decimals: 0))
-                    .font(.odo(size: 16, weight: .bold))
-                    .foregroundColor(selected ? Theme.background : Theme.ink)
+                    .font(.odo(size: 18, weight: .bold).monospacedDigit())
+                    .foregroundColor(Theme.ink)
                 Text(option.detail)
-                    .font(.odo(size: 9))
-                    .foregroundColor(selected ? Theme.background.opacity(0.7) : Theme.textTertiary)
+                    .font(.odo(size: 10))
+                    .foregroundColor(Theme.textTertiary)
+                    .lineLimit(1)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
-            .background(selected ? Theme.ink : Theme.cardRaised)
-            .overlay(RoundedRectangle(cornerRadius: 9).stroke(selected ? Color.clear : Theme.hairline, lineWidth: 1))
-            .cornerRadius(9)
+            .padding(.horizontal, 11)
+            .padding(.vertical, 9)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(Theme.cardRaised)
+            .overlay(RoundedRectangle(cornerRadius: 10)
+                .stroke(selected ? Theme.accentInk : Theme.hairline, lineWidth: selected ? 1.5 : 1))
+            .cornerRadius(10)
             .contentShape(Rectangle())
         }
         .buttonStyle(.borderless)

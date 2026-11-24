@@ -85,4 +85,23 @@ enum OdoMark {
         image.accessibilityDescription = "Odo"
         return image
     }
+
+    /// The menu bar mark with a small hammer after it, for preview builds
+    static func previewMenuBarImage(height: CGFloat = 13) -> NSImage {
+        let mark = menuBarImage(height: height)
+        let config = NSImage.SymbolConfiguration(pointSize: height * 0.72, weight: .bold)
+        guard let hammer = NSImage(systemSymbolName: "hammer.fill", accessibilityDescription: nil)?
+            .withSymbolConfiguration(config) else { return mark }
+        let gap: CGFloat = 3
+        let size = NSSize(width: mark.size.width + gap + hammer.size.width, height: height)
+        let image = NSImage(size: size, flipped: false) { _ in
+            mark.draw(in: NSRect(origin: .zero, size: mark.size))
+            let y = (height - hammer.size.height) / 2
+            hammer.draw(in: NSRect(x: mark.size.width + gap, y: y, width: hammer.size.width, height: hammer.size.height))
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "Odo Preview"
+        return image
+    }
 }
