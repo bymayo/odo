@@ -1,5 +1,7 @@
 import AppKit
 
+Fonts.register()
+
 let app = NSApplication.shared
 let delegate = AppDelegate()
 app.delegate = delegate

@@ -20,7 +20,7 @@ struct SubTypeFilterChips: View {
             if !tags.isEmpty {
                 HStack(alignment: .top, spacing: 8) {
                     Text("Tags")
-                        .font(.system(size: 9))
+                        .font(.odo(size: 9))
                         .foregroundColor(Theme.textTertiary)
                         .padding(.top, 5)
                     FlowLayout(spacing: 5) {
@@ -74,11 +74,11 @@ struct SubTypeFilterChips: View {
         HStack(spacing: 4) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 8, weight: .semibold))
+                    .font(.odo(size: 8, weight: .semibold))
                     .opacity(style == .filled ? 1 : 0.7)
             }
             Text(text)
-                .font(.system(size: 10, weight: style == .filled ? .medium : .regular))
+                .font(.odo(size: 10, weight: style == .filled ? .medium : .regular))
                 .strikethrough(style == .off, color: Theme.textTertiary)
         }
         .padding(.horizontal, 8)

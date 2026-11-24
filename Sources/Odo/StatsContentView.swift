@@ -66,7 +66,7 @@ struct StatsContentView: View {
                 Image(systemName: filtering
                       ? "line.3.horizontal.decrease.circle.fill"
                       : "line.3.horizontal.decrease")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.odo(size: 12, weight: .medium))
                     .foregroundColor(showFilters || filtering ? Theme.ink : Theme.textSecondary)
                     .frame(width: 34, height: 34)
                     .background(showFilters ? Theme.cardRaised : Theme.card)
@@ -94,9 +94,9 @@ struct StatsContentView: View {
         return Button(action: { tab = value }) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.odo(size: 10, weight: .medium))
                 Text(title)
-                    .font(.system(size: 11, weight: selected ? .medium : .regular))
+                    .font(.odo(size: 11, weight: selected ? .medium : .regular))
             }
             .frame(maxWidth: .infinity)
             .padding(.vertical, 6)
@@ -269,12 +269,12 @@ struct StatsContentView: View {
                     Spacer()
                     VStack(spacing: 4) {
                         Text("No goals set")
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.odo(size: 13, weight: .medium))
                             .foregroundColor(Theme.textSecondary)
                         if let sport = viewModel.selectedSport, !viewModel.smartSuggestions(for: sport).isEmpty {
                             Button(action: { viewModel.applyDefaultSmartGoals(for: sport) }) {
                                 Label("Suggest goals", systemImage: "sparkles")
-                                    .font(.system(size: 11, weight: .semibold))
+                                    .font(.odo(size: 11, weight: .semibold))
                                     .padding(.horizontal, 12)
                                     .padding(.vertical, 6)
                                     .foregroundColor(Theme.background)
@@ -284,11 +284,11 @@ struct StatsContentView: View {
                             .buttonStyle(.borderless)
                             .padding(.top, 4)
                             Text("Beats your recent years by \(settings.smartBeatPercent)% · change in Settings")
-                                .font(.system(size: 10))
+                                .font(.odo(size: 10))
                                 .foregroundColor(Theme.textTertiary)
                         } else {
                             Text("Set goals in Settings")
-                                .font(.system(size: 11))
+                                .font(.odo(size: 11))
                                 .foregroundColor(Theme.textTertiary)
                         }
                     }

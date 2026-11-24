@@ -171,10 +171,10 @@ struct SmartGoalPicker: View {
         VStack(alignment: .leading, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Label("Smart \(suggestions.title.lowercased()) goal", systemImage: "sparkles")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.odo(size: 13, weight: .semibold))
                     .foregroundColor(Theme.ink)
                 Text(suggestions.basis.prefix(1).uppercased() + suggestions.basis.dropFirst())
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
 
@@ -187,19 +187,19 @@ struct SmartGoalPicker: View {
             HStack(spacing: 14) {
                 Stepper(value: $settings.smartBeatPercent, in: 1...50) {
                     Text("Beat +\(settings.smartBeatPercent)%")
-                        .font(.system(size: 11).monospacedDigit())
+                        .font(.odo(size: 11).monospacedDigit())
                         .foregroundColor(Theme.textSecondary)
                 }
                 Stepper(value: $settings.smartStretchPercent, in: 1...100) {
                     Text("Stretch +\(settings.smartStretchPercent)%")
-                        .font(.system(size: 11).monospacedDigit())
+                        .font(.odo(size: 11).monospacedDigit())
                         .foregroundColor(Theme.textSecondary)
                 }
             }
             .controlSize(.small)
 
             Text("Only sets this goal.")
-                .font(.system(size: 10))
+                .font(.odo(size: 10))
                 .foregroundColor(Theme.textTertiary)
         }
         .padding(14)
@@ -211,13 +211,13 @@ struct SmartGoalPicker: View {
         return Button(action: { onPick(option.value) }) {
             VStack(alignment: .leading, spacing: 1) {
                 Text(option.label)
-                    .font(.system(size: 9, weight: .medium))
+                    .font(.odo(size: 9, weight: .medium))
                     .foregroundColor(selected ? Theme.background.opacity(0.7) : Theme.textTertiary)
                 Text(formatNumber(option.value, decimals: 0))
-                    .font(.system(size: 16, weight: .black).width(.condensed).italic())
+                    .font(.odo(size: 16, weight: .bold))
                     .foregroundColor(selected ? Theme.background : Theme.ink)
                 Text(option.detail)
-                    .font(.system(size: 9))
+                    .font(.odo(size: 9))
                     .foregroundColor(selected ? Theme.background.opacity(0.7) : Theme.textTertiary)
             }
             .padding(.horizontal, 10)

@@ -5,17 +5,31 @@ import AppKit
 // MARK: - Theme
 
 enum Theme {
-    // Neutral surfaces, Pacebar-style. Adapts to light / dark appearance.
-    static let background = dynamic(light: 0xF4F5F4, dark: 0x151615)
-    static let card = dynamic(light: 0xEBECEA, dark: 0x1F201F)
-    static let cardRaised = dynamic(light: 0xFBFBFA, dark: 0x2A2B2A)
+    // Neutral surfaces: true greys, as on odo's site. Adapts to light / dark.
+    static let background = dynamic(light: 0xF4F4F4, dark: 0x0B0B0B)
+    static let card = dynamic(light: 0xE9E9E9, dark: 0x181818)
+    static let cardRaised = dynamic(light: 0xFCFCFC, dark: 0x242424)
     /// Base ink colour; use with opacity for secondary text, hairlines and tracks
-    static let ink = dynamic(light: 0x151615, dark: 0xF5F5F4)
+    static let ink = dynamic(light: 0x0B0B0B, dark: 0xF4F4F4)
     static let hairline = ink.opacity(0.07)
 
-    // The one accent — reserved for data (current year, progress, markers)
-    static let accent = dynamic(light: 0x268A50, dark: 0x3FB871)
-    static let positive = accent
+    // Brand colours, fixed in both appearances: lime only ever sits on black
+    static let brandLime = Color(nsColor: NSColor(srgbRed: 0xDC / 255.0, green: 1, blue: 0x50 / 255.0, alpha: 1))
+    static let brandBlack = Color(nsColor: NSColor(srgbRed: 0x0B / 255.0, green: 0x0B / 255.0, blue: 0x0B / 255.0, alpha: 1))
+
+    // The one accent, reserved for data (current year, progress, markers).
+    // Lime in dark mode; lime washes out on light grey, so light mode goes black.
+    /// Fills: bars, progress, areas and switches
+    static let accent = dynamic(light: 0x0B0B0B, dark: 0xDCFF50)
+    /// Lines, dots and text
+    static let accentInk = accent
+    /// Soft fill under a line chart, solid so it reads the same on any card
+    static let accentWash = dynamic(light: 0xD9D9D9, dark: 0x3C4220)
+    static let positive = dynamic(light: 0x0B0B0B, dark: 0xDCFF50)
+    /// Behind pace or down on last year: plain ink, so the minus sign does the
+    /// work and red stays for things that are actually wrong
+    static let behind = ink
+    /// Errors and warnings only
     static let negative = dynamic(light: 0xC83A32, dark: 0xFF6B5F)
     static let gold = dynamic(light: 0xA66A11, dark: 0xE8B44A)
     static let silver = dynamic(light: 0x8A9099, dark: 0xC4CAD3)

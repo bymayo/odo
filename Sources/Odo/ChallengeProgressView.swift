@@ -60,7 +60,7 @@ struct ChallengeProgressView: View {
     }
 
     private var paceText: String { "\(aheadBehind >= 0 ? "+" : "−")\(fmt(abs(aheadBehind)))" }
-    private var paceColor: Color { aheadBehind >= 0 ? Theme.positive : Theme.negative }
+    private var paceColor: Color { aheadBehind >= 0 ? Theme.positive : Theme.behind }
 
     var body: some View {
         Group {
@@ -78,18 +78,18 @@ struct ChallengeProgressView: View {
             // Hero: progress against the goal, with the percentage on the right
             HStack(alignment: .lastTextBaseline, spacing: 5) {
                 Text(heroText)
-                    .font(.system(size: 40, weight: .black).width(.condensed).italic())
+                    .font(.odo(size: 40, weight: .bold))
                     .tracking(-1)
                     .foregroundColor(Theme.ink)
                     .lineLimit(1)
                     .minimumScaleFactor(0.6)
                 Text("/ \(goalText) \(heroUnit)")
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.odo(size: 13, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                     .lineLimit(1)
                 Spacer(minLength: 8)
                 Text(percentText)
-                    .font(.system(size: 15, weight: .semibold).monospacedDigit())
+                    .font(.odo(size: 15, weight: .semibold).monospacedDigit())
                     .foregroundColor(Theme.ink)
             }
             .padding(.top, -6)
@@ -105,7 +105,7 @@ struct ChallengeProgressView: View {
                     Spacer(minLength: 8)
                     let diff = current - lastYearToDate
                     stat("\(diff >= 0 ? "+" : "−")\(whole(abs(diff)))", "vs \(lastYearLabel)",
-                         color: diff >= 0 ? Theme.positive : Theme.negative)
+                         color: diff >= 0 ? Theme.positive : Theme.behind)
                         .help("\(lastYearLabel) had \(amount(lastYearToDate)) by today's date")
                 }
             }
@@ -126,15 +126,15 @@ struct ChallengeProgressView: View {
                 HStack(spacing: 8) {
                     label
                     Spacer(minLength: 8)
-                    (Text(heroText).foregroundColor(Theme.ink).font(.system(size: 13, weight: .semibold).monospacedDigit())
-                     + Text(" / \(goalText) \(heroUnit)").foregroundColor(Theme.textTertiary).font(.system(size: 11)))
+                    (Text(heroText).foregroundColor(Theme.ink).font(.odo(size: 13, weight: .semibold).monospacedDigit())
+                     + Text(" / \(goalText) \(heroUnit)").foregroundColor(Theme.textTertiary).font(.odo(size: 11)))
                         .lineLimit(1)
                     Text(paceText)
-                        .font(.system(size: 11, weight: .semibold).monospacedDigit())
+                        .font(.odo(size: 11, weight: .semibold).monospacedDigit())
                         .foregroundColor(paceColor)
                         .lineLimit(1)
                     Image(systemName: "chevron.down")
-                        .font(.system(size: 8, weight: .semibold))
+                        .font(.odo(size: 8, weight: .semibold))
                         .foregroundColor(Theme.textTertiary)
                 }
                 miniBar
@@ -149,9 +149,9 @@ struct ChallengeProgressView: View {
     private var label: some View {
         HStack(spacing: 5) {
             Image(systemName: icon)
-                .font(.system(size: 10, weight: .medium))
+                .font(.odo(size: 10, weight: .medium))
             Text(title)
-                .font(.system(size: 12))
+                .font(.odo(size: 12))
         }
         .foregroundColor(Theme.textSecondary)
     }
@@ -210,14 +210,14 @@ struct ChallengeProgressView: View {
     private func forecastRow(icon: String, lead: String, tail: String, good: Bool) -> some View {
         HStack(spacing: 6) {
             Image(systemName: icon)
-                .font(.system(size: 10))
+                .font(.odo(size: 10))
                 .foregroundColor(Theme.textTertiary)
             Text(lead)
-                .font(.system(size: 11, weight: .medium))
+                .font(.odo(size: 11, weight: .medium))
                 .foregroundColor(Theme.ink.opacity(0.8))
             Text("· \(tail)")
-                .font(.system(size: 11))
-                .foregroundColor(good ? Theme.positive : Theme.negative)
+                .font(.odo(size: 11))
+                .foregroundColor(good ? Theme.positive : Theme.behind)
             Spacer(minLength: 0)
         }
     }
@@ -250,10 +250,10 @@ struct ChallengeProgressView: View {
     private var weeklyCallout: some View {
         let plan = catchUp
         return HStack(spacing: 8) {
-            tile(icon: "arrow.up.right", tint: Theme.negative,
+            tile(icon: "arrow.up.right", tint: Theme.ink,
                  label: Text("To get on pace"),
-                 value: weekly(plan.neededPerWeek), valueColor: Theme.negative,
-                 background: Theme.negative.opacity(0.09))
+                 value: weekly(plan.neededPerWeek), valueColor: Theme.ink,
+                 background: Theme.cardRaised.opacity(0.6))
                 .help("\(weekly(plan.neededPerWeek)) from now to 31 Dec finishes on \(amount(goal)).")
 
             if let doable = plan.doable {
@@ -275,18 +275,18 @@ struct ChallengeProgressView: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 7, weight: .heavy))
-                    .foregroundColor(.white)
+                    .font(.odo(size: 7, weight: .heavy))
+                    .foregroundColor(Theme.background)
                     .frame(width: 13, height: 13)
                     .background(Circle().fill(tint))
                 label
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.odo(size: 10, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                     .lineLimit(1)
                     .minimumScaleFactor(0.85)
             }
             Text(value)
-                .font(.system(size: 14, weight: .bold).monospacedDigit())
+                .font(.odo(size: 14, weight: .bold).monospacedDigit())
                 .foregroundColor(valueColor)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -307,7 +307,7 @@ struct ChallengeProgressView: View {
         return catchUp.doable?.total
     }
 
-    /// Pacebar-style scale: green fill for progress, a fainter green on to where
+    /// Pacebar-style scale: lime fill for progress, a fainter lime on to where
     /// this rate finishes, a dark tick for where you should be today and a gold
     /// tick for the doable target
     private var paceBar: some View {
@@ -321,7 +321,7 @@ struct ChallengeProgressView: View {
                 // Where this year's rate finishes
                 if projected > progress {
                     RoundedRectangle(cornerRadius: 3)
-                        .fill(Theme.accent.opacity(0.1))
+                        .fill(Theme.accent.opacity(0.14))
                         .frame(width: w * projected)
                     Rectangle()
                         .fill(Self.projectedColor)
@@ -330,11 +330,11 @@ struct ChallengeProgressView: View {
                 }
 
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Theme.accent.opacity(0.18))
+                    .fill(Theme.accent)
                     .frame(width: w * progress)
 
                 Rectangle()
-                    .fill(Theme.accent)
+                    .fill(Theme.accentInk)
                     .frame(width: 2.5)
                     .offset(x: max(0, w * progress - 1.25))
 
@@ -375,7 +375,7 @@ struct ChallengeProgressView: View {
     private func stat(_ value: String, _ label: String, color: Color = Theme.ink, marker: Marker? = nil) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .font(.odo(size: 13, weight: .semibold).monospacedDigit())
                 .foregroundColor(color)
                 .lineLimit(1)
                 .minimumScaleFactor(0.8)
@@ -386,7 +386,7 @@ struct ChallengeProgressView: View {
                 case nil: EmptyView()
                 }
                 Text(label)
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
                     .lineLimit(1)
             }

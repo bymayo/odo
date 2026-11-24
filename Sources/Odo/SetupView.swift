@@ -9,11 +9,11 @@ struct SetupView: View {
             Spacer()
 
             Image(systemName: "figure.run")
-                .font(.system(size: 36))
+                .font(.odo(size: 36))
                 .foregroundColor(Theme.textSecondary)
 
             Text("Connect to Strava")
-                .font(.system(size: 16, weight: .bold, design: .rounded))
+                .font(.odo(size: 16, weight: .bold))
                 .foregroundColor(Theme.ink)
 
             Text("Enter your Strava API credentials.\nCreate an app at strava.com/settings/api\nSet callback domain to \"localhost\"")

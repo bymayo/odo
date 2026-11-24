@@ -58,6 +58,16 @@ else
     echo -e "${YELLOW}Code signing: DISABLED (ad-hoc, for this Mac only)${NC}"
 fi
 
+# --- Fonts -------------------------------------------------------------------
+# Switzer isn't in the repo (its licence forbids that); fetch it from Fontshare.
+# A release must have it, so signed builds fail without it; local builds fall
+# back to the system font.
+step "Fetching fonts..."
+if ! ./Scripts/fetch-fonts.sh; then
+    [ "$SIGN_APP" = true ] && { echo -e "${RED}Error: couldn't download Switzer.${NC}"; exit 1; }
+    echo -e "${YELLOW}Warning: couldn't download Switzer; this build uses the system font.${NC}"
+fi
+
 # --- Build (universal) -------------------------------------------------------
 step "Compiling release (arm64 + x86_64)..."
 ARCHS=(--arch arm64 --arch x86_64)
@@ -75,6 +85,10 @@ ditto "${BIN_DIR}/Sparkle.framework" "${APP_PATH}/Contents/Frameworks/Sparkle.fr
 cp "${INFO_PLIST}" "${APP_PATH}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString ${VERSION}" "${APP_PATH}/Contents/Info.plist"
 [ -f "${ICON}" ] && cp "${ICON}" "${APP_PATH}/Contents/Resources/AppIcon.icns"
+if ls .fonts/*.otf >/dev/null 2>&1; then
+    mkdir -p "${APP_PATH}/Contents/Resources/Fonts"
+    cp .fonts/*.otf .fonts/LICENSE.txt "${APP_PATH}/Contents/Resources/Fonts/"
+fi
 
 # --- Sign --------------------------------------------------------------------
 SPARKLE="${APP_PATH}/Contents/Frameworks/Sparkle.framework"

@@ -28,7 +28,7 @@ func renderIcon(pixels: Int) -> CGImage {
     ctx.saveGState()
     ctx.setShadow(offset: CGSize(width: 0, height: -10), blur: 28, color: color(0x000000, 0.35))
     ctx.addPath(shape)
-    ctx.setFillColor(color(0x1B1C1B))
+    ctx.setFillColor(color(0x0B0B0B))
     ctx.fillPath()
     ctx.restoreGState()
 
@@ -36,7 +36,7 @@ func renderIcon(pixels: Int) -> CGImage {
     ctx.saveGState()
     ctx.addPath(shape)
     ctx.clip()
-    let fill = CGGradient(colorsSpace: nil, colors: [color(0x2A2C2A), color(0x121312)] as CFArray,
+    let fill = CGGradient(colorsSpace: nil, colors: [color(0x1C1C1C), color(0x0B0B0B)] as CFArray,
                           locations: [0, 1])!
     ctx.drawLinearGradient(fill, start: CGPoint(x: 512, y: 924), end: CGPoint(x: 512, y: 100), options: [])
     // Hairline highlight round the edge
@@ -49,7 +49,7 @@ func renderIcon(pixels: Int) -> CGImage {
     // The mark
     let markBounds = CGRect(x: 512 - 290, y: 512 - 290, width: 580, height: 580)
     OdoMark.draw(in: ctx, bounds: markBounds, lineWidth: 78,
-                 track: color(0xFFFFFF, 0.14), lap: color(0x3FB871),
+                 track: color(0xFFFFFF, 0.14), lap: color(0xDCFF50),
                  startLine: color(0xFFFFFF, 0.9))
 
     return ctx.makeImage()!

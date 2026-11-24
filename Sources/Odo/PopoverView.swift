@@ -88,10 +88,10 @@ struct PopoverView: View {
                 OdoMarkView(lineWidth: 2.2)
                     .frame(width: 18, height: 18)
                     .frame(width: 26, height: 26)
-                    .background(Theme.card)
+                    .background(Theme.brandBlack)
                     .cornerRadius(7)
                 Text("Odo")
-                    .font(.system(size: 14, weight: .medium))
+                    .font(.odo(size: 14, weight: .medium))
                     .foregroundColor(Theme.ink)
             }
 
@@ -138,30 +138,30 @@ struct PopoverView: View {
             Spacer()
             if let until = viewModel.rateLimitedUntil {
                 Image(systemName: "hourglass")
-                    .font(.system(size: 22, weight: .light))
+                    .font(.odo(size: 22, weight: .light))
                     .foregroundColor(Theme.gold)
                 Text("Strava needs a breather")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.odo(size: 13, weight: .semibold))
                     .foregroundColor(Theme.ink)
                 Text("Odo hit Strava's API limit. It'll pick up where it stopped at \(until.shortTimeOrTomorrow).")
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(Theme.textSecondary)
                     .multilineTextAlignment(.center)
             } else {
                 ProgressView()
                     .controlSize(.small)
                 Text("Syncing your Strava history")
-                    .font(.system(size: 13, weight: .semibold))
+                    .font(.odo(size: 13, weight: .semibold))
                     .foregroundColor(Theme.ink)
                 if case .syncing(let year, let fetched) = viewModel.syncStatus {
                     Text(fetched > 0
                          ? "Fetching \(String(year)) · \(fetched.formatted()) activities so far"
                          : "Fetching \(String(year))…")
-                        .font(.system(size: 11).monospacedDigit())
+                        .font(.odo(size: 11).monospacedDigit())
                         .foregroundColor(Theme.textSecondary)
                 }
                 Text("The first sync works back through every year, so it can take a minute.")
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
                     .multilineTextAlignment(.center)
                     .padding(.top, 4)
@@ -199,7 +199,7 @@ struct PopoverView: View {
             .buttonStyle(.borderless)
             .help("Quit Odo")
         }
-        .font(.system(size: 11))
+        .font(.odo(size: 11))
         .foregroundColor(Theme.textTertiary)
         .padding(.horizontal, 14)
         .padding(.vertical, 9)
@@ -216,10 +216,10 @@ struct PopoverView: View {
                     .monospacedDigit()
                     .lineLimit(1)
             }
-            .font(.system(size: 10))
+            .font(.odo(size: 10))
         case .rateLimited:
             Label(viewModel.syncStatus.description, systemImage: "hourglass")
-                .font(.system(size: 10))
+                .font(.odo(size: 10))
                 .foregroundColor(Theme.gold)
                 .lineLimit(1)
                 .help("Strava allows a set number of API requests every 15 minutes and every day. "
@@ -227,11 +227,11 @@ struct PopoverView: View {
                       + (viewModel.rateLimit?.summary.map { "\n\nUsage: \($0)" } ?? ""))
         case .done:
             Label("Synced", systemImage: "checkmark")
-                .font(.system(size: 10))
+                .font(.odo(size: 10))
         case .idle:
             if let lastUpdated = viewModel.lastUpdated {
                 Text("Updated \(lastUpdated.timeAgoDisplay())")
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
             }
         }
     }
@@ -251,9 +251,9 @@ struct OdoMarkView: View {
             let path = Path(OdoMark.trackPath(in: bounds, lineWidth: lineWidth)).applying(flip)
             let length = OdoMark.perimeter(in: bounds, lineWidth: lineWidth)
 
-            ctx.stroke(path, with: .color(Theme.ink.opacity(0.18)),
+            ctx.stroke(path, with: .color(Color.white.opacity(0.2)),
                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            ctx.stroke(path, with: .color(Theme.accent),
+            ctx.stroke(path, with: .color(Theme.brandLime),
                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round,
                                           dash: [length * OdoMark.progress, length]))
         }

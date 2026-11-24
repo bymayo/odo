@@ -51,25 +51,25 @@ struct WeekProgressView: View {
             HStack(alignment: .firstTextBaseline) {
                 HStack(spacing: 5) {
                     Image(systemName: "calendar")
-                        .font(.system(size: 10, weight: .medium))
+                        .font(.odo(size: 10, weight: .medium))
                     Text("This week")
-                        .font(.system(size: 12))
+                        .font(.odo(size: 12))
                 }
                 .foregroundColor(Theme.textSecondary)
 
                 Spacer()
 
                 Text(statusText)
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(hasTarget && total >= weeklyTarget ? Theme.positive : Theme.textTertiary)
             }
 
             HStack(alignment: .lastTextBaseline, spacing: 5) {
                 Text(fmt(total))
-                    .font(.system(size: 30, weight: .black).width(.condensed).italic())
+                    .font(.odo(size: 30, weight: .bold))
                     .foregroundColor(Theme.ink)
                 Text(hasTarget ? "/ \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit)" : (useTimeFormat ? "" : unit))
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.odo(size: 13, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
             }
@@ -85,7 +85,7 @@ struct WeekProgressView: View {
                     VStack(spacing: 5) {
                         dot(for: i)
                         Text(i < dayLetters.count ? dayLetters[i] : "")
-                            .font(.system(size: 9, weight: i == todayIndex ? .semibold : .regular))
+                            .font(.odo(size: 9, weight: i == todayIndex ? .semibold : .regular))
                             .foregroundColor(i == todayIndex ? Theme.ink : Theme.textTertiary)
                     }
                     .frame(maxWidth: .infinity)
@@ -112,20 +112,20 @@ struct WeekProgressView: View {
     private var streakRow: some View {
         HStack(spacing: 6) {
             Image(systemName: streak > 0 ? "flame.fill" : "flame")
-                .font(.system(size: 11))
+                .font(.odo(size: 11))
                 .foregroundColor(streak > 0 ? Theme.gold : Theme.textTertiary)
             if streak > 0 {
                 (Text("\(streak)-week streak")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.odo(size: 11, weight: .semibold))
                     .foregroundColor(Theme.ink)
                  + Text(streak >= bestStreak ? " · best this year" : " · best \(bestStreak)")
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(Theme.textTertiary))
             } else {
                 Text(bestStreak > 0
                      ? "Hit \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit) this week to restart your streak · best \(bestStreak)"
                      : "Hit \(fmt(weeklyTarget)) \(useTimeFormat ? "" : unit) this week to start a streak")
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(Theme.textTertiary)
             }
             Spacer(minLength: 0)
@@ -157,20 +157,20 @@ struct WeekProgressView: View {
         return VStack(spacing: 5) {
             HStack(spacing: 7) {
                 Image(systemName: s.sport.icon)
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(Theme.textSecondary)
                     .frame(width: 16)
                 Text(s.sport.displayName)
-                    .font(.system(size: 11))
+                    .font(.odo(size: 11))
                     .foregroundColor(Theme.ink)
                 Spacer()
                 if s.done {
                     Image(systemName: "checkmark")
-                        .font(.system(size: 9, weight: .bold))
+                        .font(.odo(size: 9, weight: .bold))
                         .foregroundColor(Theme.positive)
                 }
                 Text(s.target > 0 ? "\(fmt(s.total)) / \(fmt(s.target))\(unit)" : "\(fmt(s.total))\(unit)")
-                    .font(.system(size: 11).monospacedDigit())
+                    .font(.odo(size: 11).monospacedDigit())
                     .foregroundColor(s.total > 0 ? Theme.textSecondary : Theme.textTertiary)
             }
             if s.target > 0 {

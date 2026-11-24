@@ -7,3 +7,4 @@ DerivedData/
 build/
 .env.local
 .env.*
+.fonts/

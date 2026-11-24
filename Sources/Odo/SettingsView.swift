@@ -58,7 +58,7 @@ private struct GeneralSettings: View {
                         .frame(width: 5, height: 5)
                 }
                 Text(viewModel.menuBarText)
-                    .font(.system(size: 12).monospacedDigit())
+                    .font(.odo(size: 12).monospacedDigit())
             }
             .foregroundColor(Theme.ink)
             .padding(.horizontal, 10)
@@ -278,10 +278,10 @@ private struct GoalsSettings: View {
             HStack {
                 VStack(alignment: .leading, spacing: 2) {
                     Text(sport.displayName)
-                        .font(.system(size: 20, weight: .bold))
+                        .font(.odo(size: 20, weight: .bold))
                         .foregroundColor(Theme.ink)
                     Text("\(String(viewModel.currentYear)) targets · 0 hides a goal · ✦ suggests one")
-                        .font(.system(size: 11))
+                        .font(.odo(size: 11))
                         .foregroundColor(Theme.textTertiary)
                 }
                 Spacer()
@@ -342,7 +342,7 @@ private struct GoalEditor: View {
     }
 }
 
-/// Nike-style goal input: small label, huge condensed number you can type into
+/// Nike-style goal input: small label, huge number you can type into
 private struct BigNumberField: View {
     let label: String
     let icon: String
@@ -355,7 +355,7 @@ private struct BigNumberField: View {
 
     @State private var showSmart = false
 
-    private static let numberFont = Font.system(size: 38, weight: .black).width(.condensed).italic()
+    private static let numberFont = Font.odo(size: 38, weight: .bold)
 
     private var daysInYear: Double {
         Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
@@ -376,19 +376,19 @@ private struct BigNumberField: View {
         VStack(alignment: .leading, spacing: 4) {
             HStack(spacing: 5) {
                 Image(systemName: icon)
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.odo(size: 10, weight: .medium))
                 Text(label)
-                    .font(.system(size: 12))
+                    .font(.odo(size: 12))
                 Spacer()
                 if let hint {
                     Text(hint)
-                        .font(.system(size: 10))
+                        .font(.odo(size: 10))
                         .foregroundColor(Theme.textTertiary)
                 }
                 if let suggestions {
                     Button(action: { showSmart.toggle() }) {
                         Image(systemName: "sparkles")
-                            .font(.system(size: 11, weight: .medium))
+                            .font(.odo(size: 11, weight: .medium))
                             .foregroundColor(showSmart ? Theme.ink : Theme.textSecondary)
                             .frame(width: 22, height: 22)
                             .background(showSmart ? Theme.cardRaised : Color.clear)
@@ -420,16 +420,16 @@ private struct BigNumberField: View {
                 }
                 .fixedSize()
                 Text(unit)
-                    .font(.system(size: 13, weight: .medium))
+                    .font(.odo(size: 13, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                 Spacer()
                 Image(systemName: "pencil")
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
 
             Text(value > 0 ? breakdown : "No goal · hidden from the popover")
-                .font(.system(size: 11).monospacedDigit())
+                .font(.odo(size: 11).monospacedDigit())
                 .foregroundColor(Theme.textTertiary)
         }
         .padding(16)
@@ -477,7 +477,7 @@ private struct SportsSettings: View {
                         let on = settings.visibleYears.isEmpty || settings.visibleYears.contains(year)
                         Button(action: { toggle(year, in: previousYears) }) {
                             Text(String(year))
-                                .font(.system(size: 11, weight: on ? .medium : .regular).monospacedDigit())
+                                .font(.odo(size: 11, weight: on ? .medium : .regular).monospacedDigit())
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 5)
                                 .foregroundColor(on ? Theme.ink : Theme.textTertiary)
@@ -563,9 +563,9 @@ struct PillTabs: View {
                 Button(action: { selection = tab.id }) {
                     HStack(spacing: 5) {
                         Image(systemName: tab.icon)
-                            .font(.system(size: 10, weight: .medium))
+                            .font(.odo(size: 10, weight: .medium))
                         Text(tab.title)
-                            .font(.system(size: 11, weight: selected ? .medium : .regular))
+                            .font(.odo(size: 11, weight: selected ? .medium : .regular))
                     }
                     .frame(maxWidth: .infinity)
                     .padding(.vertical, 6)
@@ -592,11 +592,11 @@ struct SportTabLabel: View {
     var body: some View {
         if sport == .all {
             Text("All")
-                .font(.system(size: 11, weight: selected ? .semibold : .medium))
+                .font(.odo(size: 11, weight: selected ? .semibold : .medium))
                 .padding(.horizontal, 4)
         } else {
             Image(systemName: sport.icon)
-                .font(.system(size: 13, weight: selected ? .medium : .regular))
+                .font(.odo(size: 13, weight: selected ? .medium : .regular))
         }
     }
 }
@@ -642,7 +642,7 @@ private struct SettingsSection<Content: View>: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
             Text(title)
-                .font(.system(size: 12))
+                .font(.odo(size: 12))
                 .foregroundColor(Theme.textSecondary)
                 .padding(.horizontal, 4)
 
@@ -656,7 +656,7 @@ private struct SettingsSection<Content: View>: View {
 
             if let footer {
                 Text(footer)
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
                     .padding(.horizontal, 4)
             }
@@ -681,17 +681,17 @@ private struct SettingsRow<Control: View>: View {
         HStack(spacing: 10) {
             if let icon {
                 Image(systemName: icon)
-                    .font(.system(size: 12))
+                    .font(.odo(size: 12))
                     .foregroundColor(Theme.textSecondary)
                     .frame(width: 18)
             }
             VStack(alignment: .leading, spacing: 1) {
                 Text(title)
-                    .font(.system(size: 12))
+                    .font(.odo(size: 12))
                     .foregroundColor(Theme.ink)
                 if let detail {
                     Text(detail)
-                        .font(.system(size: 10))
+                        .font(.odo(size: 10))
                         .foregroundColor(Theme.textTertiary)
                 }
             }
@@ -718,7 +718,7 @@ private struct HeartRateField: View {
             .multilineTextAlignment(.trailing)
             .frame(width: 52)
             Text("bpm")
-                .font(.system(size: 11))
+                .font(.odo(size: 11))
                 .foregroundColor(Theme.textTertiary)
         }
     }
@@ -738,7 +738,7 @@ private struct EmptyNote: View {
 
     var body: some View {
         Text(text)
-            .font(.system(size: 12))
+            .font(.odo(size: 12))
             .foregroundColor(Theme.textTertiary)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 40)

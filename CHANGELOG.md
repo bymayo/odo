@@ -9,6 +9,7 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 ## 1.0.0
 
 - First release of **Odo**: your yearly goals in the menu bar, from your Strava activities.
+- New look: odo's lime, black and grey and the Switzer typeface throughout the app and its icon
 - Goal cards with pace, how you compare with this time last year, and what it takes each week to get back on pace. One goal shows in full and the rest fold to a single line; click one to open it.
 - This week card with a streak of weeks hitting your weekly pace.
 - Year comparison graph with a podium for your best years, hover to scrub, click to lock.

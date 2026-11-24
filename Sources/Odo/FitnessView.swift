@@ -34,13 +34,13 @@ struct FitnessView: View {
     private var titleBar: some View {
         HStack(spacing: 12) {
             Text("Fitness")
-                .font(.system(size: 12))
+                .font(.odo(size: 12))
                 .foregroundColor(Theme.textSecondary)
             Spacer()
             ForEach(Self.ranges, id: \.days) { option in
                 Button(action: { range = option.days }) {
                     Text(option.label)
-                        .font(.system(size: 11, weight: range == option.days ? .medium : .regular))
+                        .font(.odo(size: 11, weight: range == option.days ? .medium : .regular))
                         .foregroundColor(range == option.days ? Theme.ink : Theme.textTertiary)
                 }
                 .buttonStyle(.borderless)
@@ -62,9 +62,9 @@ struct FitnessView: View {
         }
         return HStack(alignment: .top, spacing: 5) {
             Image(systemName: "info.circle")
-                .font(.system(size: 9))
+                .font(.odo(size: 9))
             Text(text)
-                .font(.system(size: 10))
+                .font(.odo(size: 10))
                 .fixedSize(horizontal: false, vertical: true)
         }
         .foregroundColor(Theme.textTertiary)
@@ -122,7 +122,7 @@ struct FitnessChart: View {
                 mainChart
                     .frame(height: 130)
                 Text("Form")
-                    .font(.system(size: 9))
+                    .font(.odo(size: 9))
                     .foregroundColor(Theme.textTertiary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                 formChart
@@ -145,11 +145,11 @@ struct FitnessChart: View {
         return HStack(alignment: .lastTextBaseline) {
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text("\(Int(selected.fitness.rounded()))")
-                    .font(.system(size: 34, weight: .black).width(.condensed).italic())
+                    .font(.odo(size: 34, weight: .bold))
                     .tracking(-0.5)
                     .foregroundColor(Theme.ink)
                 Text("fitness")
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.odo(size: 12, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
             }
 
@@ -161,18 +161,18 @@ struct FitnessChart: View {
                         .fill(Self.color(zone.kind))
                         .frame(width: 6, height: 6)
                     Text(zone.name)
-                        .font(.system(size: 11, weight: .semibold))
+                        .font(.odo(size: 11, weight: .semibold))
                         .foregroundColor(Theme.ink)
                 }
                 .help(zone.detail)
                 if let earlier {
                     let change = Int((selected.fitness - earlier).rounded())
                     Text(change == 0 ? "No change in 4 weeks" : "\(signed(Double(change))) in 4 weeks")
-                        .font(.system(size: 10, weight: .medium).monospacedDigit())
-                        .foregroundColor(change == 0 ? Theme.textSecondary : change > 0 ? Theme.positive : Theme.negative)
+                        .font(.odo(size: 10, weight: .medium).monospacedDigit())
+                        .foregroundColor(change == 0 ? Theme.textSecondary : change > 0 ? Theme.positive : Theme.textSecondary)
                 }
                 Text(dateLabel(selected.date))
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
         }
@@ -199,7 +199,7 @@ struct FitnessChart: View {
             ForEach(plotted, id: \.i) { i, day, _ in
                 AreaMark(x: .value("Day", i), yStart: .value("Base", bottom), yEnd: .value("Fitness", day.fitness),
                          series: .value("Series", "FitnessArea"))
-                    .foregroundStyle(Theme.accent.opacity(0.14))
+                    .foregroundStyle(Theme.accentWash)
                     .interpolationMethod(.monotone)
             }
             ForEach(plotted, id: \.i) { i, day, _ in
@@ -210,7 +210,7 @@ struct FitnessChart: View {
             }
             ForEach(plotted, id: \.i) { i, day, _ in
                 LineMark(x: .value("Day", i), y: .value("Value", day.fitness), series: .value("Series", "Fitness"))
-                    .foregroundStyle(Theme.accent)
+                    .foregroundStyle(Theme.accentInk)
                     .lineStyle(StrokeStyle(lineWidth: 2, lineCap: .round, lineJoin: .round))
                     .interpolationMethod(.monotone)
             }
@@ -222,7 +222,7 @@ struct FitnessChart: View {
                 .foregroundStyle(Self.fatigueColor)
                 .symbolSize(20)
             PointMark(x: .value("Day", selectedIndex), y: .value("Value", selected.fitness))
-                .foregroundStyle(Theme.accent)
+                .foregroundStyle(Theme.accentInk)
                 .symbolSize(28)
         }
         .chartXScale(domain: 0...max(todayIndex, 1))
@@ -260,7 +260,7 @@ struct FitnessChart: View {
                     AxisValueLabel(anchor: .topLeading) {
                         if let i = value.as(Int.self), days.indices.contains(i) {
                             Text(axisLabel(days[i].date))
-                                .font(.system(size: 9))
+                                .font(.odo(size: 9))
                                 .foregroundColor(Theme.textTertiary)
                         }
                     }
@@ -319,13 +319,13 @@ struct FitnessChart: View {
     private var scrubBar: some View {
         HStack {
             Text(lockedIndex != nil ? "Locked to \(dateLabel(selected.date))" : "Hover to scrub · click to lock")
-                .font(.system(size: 9))
+                .font(.odo(size: 9))
                 .foregroundColor(Theme.textTertiary)
             Spacer()
             let lockedToToday = lockedIndex == todayIndex
             Button(action: { lockedIndex = lockedToToday ? nil : todayIndex }) {
                 Text(lockedToToday ? "Unlock" : "Today")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.odo(size: 10, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                     .underline(lockedToToday)
             }
@@ -337,7 +337,7 @@ struct FitnessChart: View {
     private var stats: some View {
         let zone = Fitness.zone(form: selected.form)
         return HStack(alignment: .top, spacing: 0) {
-            stat("\(Int(selected.fitness.rounded()))", "Fitness", dot: Theme.accent,
+            stat("\(Int(selected.fitness.rounded()))", "Fitness", dot: Theme.accentInk,
                  help: "Average daily load over about six weeks")
             Spacer(minLength: 8)
             stat("\(Int(selected.fatigue.rounded()))", "Fatigue", dot: Self.fatigueColor,
@@ -359,14 +359,14 @@ struct FitnessChart: View {
     private func stat(_ value: String, _ label: String, dot: Color?, help: String) -> some View {
         VStack(alignment: .leading, spacing: 2) {
             Text(value)
-                .font(.system(size: 13, weight: .semibold).monospacedDigit())
+                .font(.odo(size: 13, weight: .semibold).monospacedDigit())
                 .foregroundColor(Theme.ink)
             HStack(spacing: 4) {
                 if let dot {
                     Circle().fill(dot).frame(width: 5, height: 5)
                 }
                 Text(label)
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
         }

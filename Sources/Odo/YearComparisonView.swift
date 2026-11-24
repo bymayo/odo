@@ -23,7 +23,7 @@ struct YearComparisonView: View {
     private var titleBar: some View {
         HStack(spacing: 12) {
             Text("Year comparison")
-                .font(.system(size: 12))
+                .font(.odo(size: 12))
                 .foregroundColor(Theme.textSecondary)
 
             Spacer()
@@ -31,7 +31,7 @@ struct YearComparisonView: View {
             ForEach([("distance", "Distance"), ("elevation", "Elevation"), ("time", "Time")], id: \.0) { key, label in
                 Button(action: { metric = key }) {
                     Text(label)
-                        .font(.system(size: 11, weight: metric == key ? .medium : .regular))
+                        .font(.odo(size: 11, weight: metric == key ? .medium : .regular))
                         .foregroundColor(metric == key ? Theme.ink : Theme.textTertiary)
                 }
                 .buttonStyle(.borderless)
@@ -45,7 +45,7 @@ struct YearComparisonView: View {
             YearSeries(
                 year: year,
                 values: viewModel.cumulativeDaily(year, sport: sport, metric: metric),
-                color: year == viewModel.currentYear ? Theme.accent : Theme.ink,
+                color: year == viewModel.currentYear ? Theme.accentInk : Theme.ink,
                 holdsAfterEnd: year == viewModel.currentYear
             )
         }
@@ -117,9 +117,9 @@ struct YearChart: View {
     }
 
     private func lineColor(_ s: YearSeries) -> Color {
-        if s.year == highlightedYear { return s.year == currentYear ? Theme.accent : Theme.ink.opacity(0.85) }
+        if s.year == highlightedYear { return s.year == currentYear ? Theme.accentInk : Theme.ink.opacity(0.85) }
         if focusedYear != nil { return Theme.ink.opacity(0.08) }
-        if s.year == currentYear { return Theme.accent }
+        if s.year == currentYear { return Theme.accentInk }
         return Theme.ink.opacity(hoveredYear == nil ? 0.18 : 0.1)
     }
 
@@ -229,13 +229,13 @@ struct YearChart: View {
     private var scrubBar: some View {
         HStack {
             Text(lockedDay != nil ? "Locked to \(dateLabel(for: selectedDay).replacingOccurrences(of: "1 Jan → ", with: ""))" : "Hover to scrub · click to lock")
-                .font(.system(size: 9))
+                .font(.odo(size: 9))
                 .foregroundColor(Theme.textTertiary)
             Spacer()
             let lockedToToday = lockedDay == today
             Button(action: { lockedDay = lockedToToday ? nil : today }) {
                 Text(lockedToToday ? "Unlock" : "Today")
-                    .font(.system(size: 10, weight: .medium))
+                    .font(.odo(size: 10, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
                     .underline(lockedToToday)
             }
@@ -275,7 +275,7 @@ struct YearChart: View {
                let last = current.values.last, current.lastDay < daysInYear {
                 ForEach([current.lastDay, daysInYear], id: \.self) { day in
                     LineMark(x: .value("Day", day), y: .value("Value", last), series: .value("Series", "Hold"))
-                        .foregroundStyle(Theme.accent.opacity(isDimmed(current) ? 0.1 : 0.35))
+                        .foregroundStyle(Theme.accentInk.opacity(isDimmed(current) ? 0.1 : 0.35))
                         .lineStyle(StrokeStyle(lineWidth: 1, dash: [1, 3]))
                 }
             }
@@ -299,7 +299,7 @@ struct YearChart: View {
                 AxisValueLabel(anchor: .topLeading) {
                     if let day = value.as(Int.self), let i = Self.quarterStarts.firstIndex(of: day) {
                         Text(Self.quarterLabels[i])
-                            .font(.system(size: 9))
+                            .font(.odo(size: 9))
                             .foregroundColor(Theme.textTertiary)
                     }
                 }
@@ -343,11 +343,11 @@ struct YearChart: View {
         return HStack(alignment: .lastTextBaseline) {
             HStack(alignment: .lastTextBaseline, spacing: 4) {
                 Text(useTimeFormat ? "\(Int(current))" : formatNumber(current, decimals: current >= 100 ? 0 : 1))
-                    .font(.system(size: 34, weight: .black).width(.condensed).italic())
+                    .font(.odo(size: 34, weight: .bold))
                     .tracking(-0.5)
                     .foregroundColor(Theme.ink)
                 Text(useTimeFormat ? "hrs" : unit)
-                    .font(.system(size: 12, weight: .medium))
+                    .font(.odo(size: 12, weight: .medium))
                     .foregroundColor(Theme.textSecondary)
             }
 
@@ -356,11 +356,11 @@ struct YearChart: View {
             VStack(alignment: .trailing, spacing: 2) {
                 if target > 0 {
                     Text("\(vsTarget >= 0 ? "+" : "−")\(fmt(abs(vsTarget))) vs target")
-                        .font(.system(size: 11, weight: .medium).monospacedDigit())
-                        .foregroundColor(vsTarget >= 0 ? Theme.positive : Theme.negative)
+                        .font(.odo(size: 11, weight: .medium).monospacedDigit())
+                        .foregroundColor(vsTarget >= 0 ? Theme.positive : Theme.behind)
                 }
                 Text(dateLabel(for: selectedDay))
-                    .font(.system(size: 10))
+                    .font(.odo(size: 10))
                     .foregroundColor(Theme.textTertiary)
             }
         }
@@ -391,14 +391,14 @@ struct YearChart: View {
                     GridRow {
                         HStack(spacing: 5) {
                             Circle()
-                                .fill(isCurrent ? Theme.accent : Theme.ink.opacity(s.year == highlightedYear ? 0.85 : 0.2))
+                                .fill(isCurrent ? Theme.accentInk : Theme.ink.opacity(s.year == highlightedYear ? 0.85 : 0.2))
                                 .frame(width: 6, height: 6)
                             Text(String(s.year))
-                                .font(.system(size: 11, weight: isCurrent ? .semibold : .regular))
+                                .font(.odo(size: 11, weight: isCurrent ? .semibold : .regular))
                                 .foregroundColor(isCurrent || s.year == highlightedYear ? Theme.ink : Theme.textSecondary)
                             if let place = podium[s.year] {
                                 Image(systemName: "crown.fill")
-                                    .font(.system(size: 7))
+                                    .font(.odo(size: 7))
                                     .foregroundColor(Self.medalColor(place))
                                     .help(["1st", "2nd", "3rd"][place - 1] + " on this day")
                             }
@@ -429,7 +429,7 @@ struct YearChart: View {
                                 .fill(Self.targetColor)
                                 .frame(width: 6, height: 1)
                             Text("Target")
-                                .font(.system(size: 11))
+                                .font(.odo(size: 11))
                                 .foregroundColor(Theme.textTertiary)
                         }
                         .frame(maxWidth: .infinity, alignment: .leading)
@@ -445,14 +445,14 @@ struct YearChart: View {
 
     private func header(_ text: String, alignment: Alignment = .trailing) -> some View {
         Text(text)
-            .font(.system(size: 9))
+            .font(.odo(size: 9))
             .foregroundColor(Theme.textTertiary)
             .frame(maxWidth: .infinity, alignment: alignment)
     }
 
     private func cell(_ text: String?, color: Color = Theme.textTertiary, weight: Font.Weight = .regular) -> some View {
         Text(text ?? "–")
-            .font(.system(size: 11, weight: weight).monospacedDigit())
+            .font(.odo(size: 11, weight: weight).monospacedDigit())
             .foregroundColor(text == nil ? Theme.ink.opacity(0.2) : color)
             .lineLimit(1)
             .fixedSize()
@@ -464,8 +464,8 @@ struct YearChart: View {
         if let value, let other {
             let diff = value - other
             Text("\(diff >= 0 ? "+" : "−")\(fmt(abs(diff)))")
-                .font(.system(size: 10).monospacedDigit())
-                .foregroundColor(diff >= 0 ? Theme.positive : Theme.negative)
+                .font(.odo(size: 10).monospacedDigit())
+                .foregroundColor(diff >= 0 ? Theme.positive : Theme.behind)
                 .lineLimit(1)
                 .fixedSize()
                 .frame(maxWidth: .infinity, alignment: .trailing)
