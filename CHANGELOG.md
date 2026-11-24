@@ -6,6 +6,10 @@ Sparkle shows in the app — so write it for the person receiving the update.
 
 Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 
+## 1.0.2
+
+- A step-by-step guide to connecting Strava when you first open Odo, with a link to Strava's API settings and a button that copies the callback domain
+
 ## 1.0.1
 
 - Turn each goal, and the This week card, on or off per sport. Switching one off keeps its number for later

@@ -30,7 +30,7 @@ struct PopoverView: View {
     @State private var heights: [String: CGFloat] = [:]
 
     /// Screens with centred content and no natural height get a fixed one
-    private static let setupHeight: CGFloat = 560
+    private static let setupHeight: CGFloat = 600
     private static let firstSyncHeight: CGFloat = 420
 
     private var showsFirstSync: Bool {
@@ -242,22 +242,47 @@ struct PopoverView: View {
 /// The mark in the app's colours, for the popover header
 struct OdoMarkView: View {
     var lineWidth: CGFloat = 2.4
+    /// Defaults suit the black tile; on the page background pass theme colours
+    var track: Color = Color.white.opacity(0.2)
+    var lap: Color = Theme.brandLime
+    /// Sends the lap round the track, one circuit every `period` seconds
+    var animated = false
+    var period: Double = 2.4
+
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
 
     var body: some View {
+        Group {
+            if animated && !reduceMotion {
+                TimelineView(.animation) { context in
+                    let t = context.date.timeIntervalSinceReferenceDate
+                    mark(turn: t.truncatingRemainder(dividingBy: period) / period)
+                }
+            } else {
+                mark(turn: 0)
+            }
+        }
+        .aspectRatio(OdoMark.aspect, contentMode: .fit)
+        .accessibilityLabel("Odo")
+    }
+
+    /// `turn` is how far round the lap has moved, 0 to 1
+    private func mark(turn: Double) -> some View {
         Canvas { ctx, size in
             let bounds = CGRect(origin: .zero, size: size)
             // Canvas is y-down; flip so the start line sits at the bottom
             let flip = CGAffineTransform(translationX: 0, y: size.height).scaledBy(x: 1, y: -1)
             let path = Path(OdoMark.trackPath(in: bounds, lineWidth: lineWidth)).applying(flip)
             let length = OdoMark.perimeter(in: bounds, lineWidth: lineWidth)
+            let lapLength = length * OdoMark.progress
 
-            ctx.stroke(path, with: .color(Color.white.opacity(0.2)),
+            ctx.stroke(path, with: .color(track),
                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round))
-            ctx.stroke(path, with: .color(Theme.brandLime),
+            // The pattern repeats once per circuit, so the lap wraps round seamlessly
+            ctx.stroke(path, with: .color(lap),
                        style: StrokeStyle(lineWidth: lineWidth, lineCap: .round,
-                                          dash: [length * OdoMark.progress, length]))
+                                          dash: [lapLength, length - lapLength],
+                                          dashPhase: -length * turn))
         }
-        .aspectRatio(OdoMark.aspect, contentMode: .fit)
-        .accessibilityLabel("Odo")
     }
 }
