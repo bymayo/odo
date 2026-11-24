@@ -1,6 +1,7 @@
 #!/bin/bash
 
-# Downloads Switzer (Indian Type Foundry, via Fontshare) into .fonts/.
+# Downloads Switzer, and General Sans Semibold for the ODO wordmark (both by
+# the Indian Type Foundry, via Fontshare), into .fonts/.
 #
 # The ITF Free Font License lets us embed the font in Odo.app but not
 # redistribute it from a public repository, so the files are never committed:
@@ -14,18 +15,25 @@ cd "$(dirname "$0")/.."
 DEST=".fonts"
 WEIGHTS=(Regular Medium Semibold Bold Extrabold Black)
 
+WORDMARK="GeneralSans-Semibold"
+
 missing=false
 for w in "${WEIGHTS[@]}"; do [ -f "${DEST}/Switzer-${w}.otf" ] || missing=true; done
+[ -f "${DEST}/${WORDMARK}.otf" ] || missing=true
 [ "$missing" = false ] && exit 0
 
-echo "Fetching Switzer from Fontshare..."
+echo "Fetching Switzer and General Sans from Fontshare..."
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
 curl -fsSL -o "${TMP}/switzer.zip" "https://api.fontshare.com/v2/fonts/download/switzer"
-unzip -q "${TMP}/switzer.zip" -d "${TMP}"
+curl -fsSL -o "${TMP}/general-sans.zip" "https://api.fontshare.com/v2/fonts/download/general-sans"
+unzip -q "${TMP}/switzer.zip" -d "${TMP}/switzer"
+unzip -q "${TMP}/general-sans.zip" -d "${TMP}/general-sans"
 
 mkdir -p "${DEST}"
 for w in "${WEIGHTS[@]}"; do
-    cp "$(find "${TMP}" -path "*OTF/Switzer-${w}.otf" | head -1)" "${DEST}/"
+    cp "$(find "${TMP}/switzer" -path "*OTF/Switzer-${w}.otf" | head -1)" "${DEST}/"
 done
-cp "$(find "${TMP}" -name FFL.txt | head -1)" "${DEST}/LICENSE.txt"
+cp "$(find "${TMP}/general-sans" -path "*OTF/${WORDMARK}.otf" | head -1)" "${DEST}/"
+# Both fonts ship under the same ITF Free Font License
+cp "$(find "${TMP}/switzer" -name FFL.txt | head -1)" "${DEST}/LICENSE.txt"

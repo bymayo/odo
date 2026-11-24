@@ -6,6 +6,8 @@ import CoreText
 /// they're missing, such as `swift run`, text falls back to the system font.
 enum Fonts {
     private(set) static var available = false
+    /// General Sans Semibold, used only for the ODO wordmark (as on the website)
+    private(set) static var wordmarkAvailable = false
 
     /// Registers the bundled fonts for this process. Call once, before any UI.
     static func register(from directory: URL? = Bundle.main.resourceURL?.appendingPathComponent("Fonts")) {
@@ -16,6 +18,7 @@ enum Fonts {
         guard !fonts.isEmpty else { return }
         CTFontManagerRegisterFontURLs(fonts as CFArray, .process, false, nil)
         available = NSFont(name: "Switzer-Regular", size: 12) != nil
+        wordmarkAvailable = NSFont(name: "GeneralSans-Semibold", size: 12) != nil
     }
 
     static func name(for weight: Font.Weight) -> String {
@@ -35,5 +38,22 @@ extension Font {
     static func odo(size: CGFloat, weight: Font.Weight = .regular) -> Font {
         guard Fonts.available else { return .system(size: size, weight: weight) }
         return .custom(Fonts.name(for: weight), fixedSize: size)
+    }
+}
+
+/// The app's name as set on odo.bymayo.co.uk: ODO in General Sans Semibold,
+/// capitals, tracked out by 0.01em. Use it wherever the name stands as a logo.
+struct Wordmark: View {
+    var size: CGFloat
+    var color: Color = Theme.ink
+
+    var body: some View {
+        Text("ODO")
+            .font(Fonts.wordmarkAvailable
+                  ? .custom("GeneralSans-Semibold", fixedSize: size)
+                  : .odo(size: size, weight: .semibold))
+            .tracking(size * 0.01)
+            .foregroundColor(color)
+            .accessibilityLabel("Odo")
     }
 }

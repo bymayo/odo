@@ -90,9 +90,7 @@ struct PopoverView: View {
                     .frame(width: 26, height: 26)
                     .background(Theme.brandBlack)
                     .cornerRadius(7)
-                Text("Odo")
-                    .font(.odo(size: 14, weight: .medium))
-                    .foregroundColor(Theme.ink)
+                Wordmark(size: 15)
             }
 
             Spacer()

@@ -78,9 +78,7 @@ struct SettingsView: View {
                     .frame(width: 24, height: 24)
                     .background(Theme.brandBlack)
                     .cornerRadius(6)
-                Text("Odo")
-                    .font(.odo(size: 14, weight: .semibold))
-                    .foregroundColor(Theme.ink)
+                Wordmark(size: 15)
             }
             .padding(.horizontal, 8)
             .padding(.bottom, 14)
@@ -268,9 +266,7 @@ private struct AboutSection: View {
                     .aspectRatio(contentMode: .fit)
                     .frame(width: 56, height: 56)
                 VStack(alignment: .leading, spacing: 3) {
-                    Text("Odo")
-                        .font(.odo(size: 17, weight: .medium))
-                        .foregroundColor(Theme.ink)
+                    Wordmark(size: 18)
                     Text("Version \(AppInfo.version)")
                         .font(.odo(size: 12))
                         .foregroundColor(Theme.textTertiary)
