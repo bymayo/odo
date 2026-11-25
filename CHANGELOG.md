@@ -9,6 +9,7 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 ## 1.0.3
 
 - The ODO name in the popover and Settings now matches the logo on odo.bymayo.co.uk
+- A shorter behind-pace reminder: how far behind you are, and one weekly figure to aim for
 
 ## 1.0.2
 

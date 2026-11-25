@@ -163,9 +163,12 @@ final class Notifier: NSObject, ObservableObject {
 
         guard force || (daysIntoWeek >= 2 && once("notified_pace", key(thisWeek), force: false)) else { return }
 
-        var body = "\(perWeek(plan.neededPerWeek, metric)) from now gets you to \(amount(goal, metric)) by 31 Dec."
+        // One suggestion: the doable target when the full goal is out of reach
+        let body: String
         if let doable = plan.doable {
-            body += " More doable: \(perWeek(doable.perWeek, metric)) reaches \(amount(doable.total, metric))."
+            body = "\(perWeek(doable.perWeek, metric)) gets you to \(amount(doable.total, metric)) this year."
+        } else {
+            body = "\(perWeek(plan.neededPerWeek, metric)) still hits your \(amount(goal, metric)) goal."
         }
         let daysInYear = Double(Calendar.current.range(of: .day, in: .year, for: Date())?.count ?? 365)
         let behind = goal * Double(vm.currentDayOfYear) / daysInYear - vm.yearToDate(sport: sport, metric: metric)
@@ -233,8 +236,10 @@ final class Notifier: NSObject, ObservableObject {
         }
     }
 
+    /// Weekly figures are rounded to whole units: "70 mi a week", not "70.1"
     private func perWeek(_ value: Double, _ metric: String) -> String {
-        "\(amount(value, metric)) a week"
+        guard metric != "time", value >= 10 else { return "\(amount(value, metric)) a week" }
+        return "\(amount(value.rounded(), metric)) a week"
     }
 
     private func compare(_ value: Double, _ other: Double, _ metric: String, _ label: String) -> String {
