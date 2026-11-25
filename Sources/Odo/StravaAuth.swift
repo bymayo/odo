@@ -142,6 +142,8 @@ enum StravaError: LocalizedError {
     case notAuthenticated
     case apiError(String)
     case rateLimited(resetsAt: Date)
+    /// 403 on the activities API: since June 2026 Strava only serves its API to subscribers
+    case subscriptionRequired
 
     var errorDescription: String? {
         switch self {
@@ -149,6 +151,8 @@ enum StravaError: LocalizedError {
         case .apiError(let msg): return msg
         case .rateLimited(let resetsAt):
             return "Strava's rate limit is reached until \(resetsAt.shortTimeOrTomorrow)"
+        case .subscriptionRequired:
+            return "Strava only lets subscribers use its API"
         }
     }
 }

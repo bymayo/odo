@@ -111,6 +111,7 @@ class StravaAPI {
                         throw StravaError.rateLimited(resetsAt: lastRateLimit?.resetsAt
                             ?? RateLimit.nextQuarterHour(after: Date()))
                     }
+                    if http.statusCode == 403 { throw StravaError.subscriptionRequired }
                     if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
                        let message = json["message"] as? String {
                         throw StravaError.apiError(message)

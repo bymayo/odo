@@ -10,6 +10,7 @@ Format: `## <version>` followed by bullets. `**Bold**` and `` `code` `` work.
 
 - The ODO name in the popover and Settings now matches the logo on odo.bymayo.co.uk
 - A shorter behind-pace reminder: how far behind you are, and one weekly figure to aim for
+- If Strava turns Odo away because its API now needs a Strava subscription, Odo says so and links to Strava's subscribe page instead of showing "Forbidden". The setup guide mentions it up front
 
 ## 1.0.2
 

@@ -43,6 +43,10 @@ struct StatsContentView: View {
                 goalsContent(stats: stats, goal: goal)
             }
 
+            if viewModel.needsSubscription {
+                SubscriptionNeededCard(viewModel: viewModel)
+            }
+
             if let error = viewModel.error {
                 HStack(spacing: 6) {
                     Image(systemName: "exclamationmark.triangle.fill")
@@ -301,5 +305,64 @@ struct StatsContentView: View {
                 .cornerRadius(14)
             }
 
+    }
+}
+
+/// Strava answered 403: its API is subscriber-only since June 2026. Says why, and how to fix it
+struct SubscriptionNeededCard: View {
+    @ObservedObject var viewModel: StravaViewModel
+
+    private static let subscribe = URL(string: "https://www.strava.com/subscribe")!
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: "lock.fill")
+                    .font(.odo(size: 12, weight: .semibold))
+                Text("Strava needs a subscription")
+                    .font(.odo(size: 13, weight: .semibold))
+            }
+            .foregroundColor(Theme.ink)
+
+            Text("Since June 2026, Strava only lets subscribers use its API. Subscribe on the Strava account that owns your API app, then sync again.")
+                .font(.odo(size: 11.5))
+                .foregroundColor(Theme.textSecondary)
+                .fixedSize(horizontal: false, vertical: true)
+
+            HStack(spacing: 8) {
+                Button(action: { NSWorkspace.shared.open(Self.subscribe) }) {
+                    HStack(spacing: 4) {
+                        Text("Subscribe on Strava")
+                        Image(systemName: "arrow.up.right")
+                            .font(.odo(size: 9, weight: .semibold))
+                    }
+                    .font(.odo(size: 12, weight: .semibold))
+                    .foregroundColor(Theme.brandBlack)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Theme.accent)
+                    .cornerRadius(7)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+
+                Button(action: { Task { await viewModel.fetchAllData() } }) {
+                    Text(viewModel.isLoading ? "Syncing…" : "Sync again")
+                        .font(.odo(size: 12, weight: .medium))
+                        .foregroundColor(Theme.ink)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Theme.cardRaised)
+                        .cornerRadius(7)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .disabled(viewModel.isLoading)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(Theme.card)
+        .cornerRadius(12)
     }
 }

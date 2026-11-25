@@ -27,6 +27,8 @@ class StravaViewModel: ObservableObject {
     /// Strava API usage from the last response
     @Published var rateLimit: RateLimit?
     @Published var error: String?
+    /// Strava refused the API because the API app's owner has no subscription
+    @Published var needsSubscription = false
     @Published var selectedSport: SportCategory?
     @Published var lastUpdated: Date?
     @Published var detectedSports: [SportCategory] = []
@@ -606,6 +608,7 @@ class StravaViewModel: ObservableObject {
         guard !isLoading, rateLimitedUntil == nil else { return }
         isLoading = true
         error = nil
+        needsSubscription = false
         var fetched = 0
         var newActivities: [StravaActivity] = []
         syncStatus = .syncing(year: currentYear, fetched: 0)
@@ -637,6 +640,8 @@ class StravaViewModel: ObservableObject {
                 staleYears.remove(currentYear)
             } catch StravaError.rateLimited(let resetsAt) {
                 throw StravaError.rateLimited(resetsAt: resetsAt)
+            } catch StravaError.subscriptionRequired {
+                throw StravaError.subscriptionRequired
             } catch {
                 self.error = "Current year: \(error.localizedDescription)"
             }
@@ -668,6 +673,8 @@ class StravaViewModel: ObservableObject {
                     }
                 } catch StravaError.rateLimited(let resetsAt) {
                     throw StravaError.rateLimited(resetsAt: resetsAt)
+                } catch StravaError.subscriptionRequired {
+                    throw StravaError.subscriptionRequired
                 } catch {
                     self.error = "\(year): \(error.localizedDescription)"
                     break
@@ -686,6 +693,8 @@ class StravaViewModel: ObservableObject {
             hitRateLimit(until: resetsAt)
             isLoading = false
             return
+        } catch StravaError.subscriptionRequired {
+            needsSubscription = true
         } catch {
             self.error = error.localizedDescription
         }

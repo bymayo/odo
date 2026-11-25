@@ -28,7 +28,7 @@ struct SetupView: View {
             .padding(.bottom, 2)
 
             SetupStep(number: 1, title: "Create a Strava API app",
-                      detail: "Any name and website will do.") {
+                      detail: "Strava only lets subscribers use its API, so you'll need a Strava subscription. Any name and website will do.") {
                 Button(action: { NSWorkspace.shared.open(Self.stravaAPI) }) {
                     HStack(spacing: 5) {
                         Text("Open Strava API settings")
